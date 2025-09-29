@@ -1,0 +1,1 @@
+pipecat-ai[webrtc,daily,silero,deepgram,openai,cartesia,local-smart-turn-v3,runner,google]>=0.0.85
