@@ -18,9 +18,14 @@ DAILY_API_URL = os.environ.get("DAILY_SAMPLE_ROOM_URL", "https://api.daily.co/v1
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 CARTESIA_API_KEY = os.environ.get("CARTESIA_API_KEY")
 
+LLM_SERVICE = os.environ.get("LLM_SERVICE", "openai")
+
 KOALA_ACCESS_KEY = os.environ.get("KOALA_ACCESS_KEY")
+
+AIC_ACCESS_KEY = os.environ.get("AIC_ACCESS_KEY")
 
 
 LIVEKIT_URL = os.getenv("LIVEKIT_URL", "wss://livekit.yourdomain.com")
