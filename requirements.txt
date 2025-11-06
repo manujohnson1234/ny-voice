@@ -1,5 +1,6 @@
 pipecat-ai[webrtc,daily,silero,deepgram,openai,cartesia,local-smart-turn-v3,runner,google,koala,livekit]>=0.0.85
 google-cloud-speech
+google-genai
 deepgram-sdk
 livekit
 livekit-api
