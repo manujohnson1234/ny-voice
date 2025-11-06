@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Add the project root to the Python path FIRST before any local imports
@@ -43,7 +44,7 @@ from google.cloud.speech_v1 import RecognitionConfig
 
 from loguru import logger
 
-from app.agents.voice.driver.router_agent.system_prompt import router_agent_system_prompt
+# from app.agents.voice.driver.router_agent.system_prompt import router_agent_system_prompt
 
 from app.agents.voice.driver.not_getting_rides.tool_schema import driver_info, send_dummy_request, send_overlay_sms
 from app.agents.voice.driver.not_getting_rides.system_prompt import not_getting_rides_system_prompt
@@ -58,12 +59,25 @@ from app.agents.voice.driver.not_getting_rides.function_handler import get_drive
 # from app.agents.voice.driver.create_agent.create_agent import CreateAgent, CreateAgentConfig
 # from app.agents.voice.driver.router_class.agent_router import AgentRouter, AgentConfig
 from app.core import config
+from app.core.session_manager import get_session_manager
 
 
 load_dotenv(override=True)
 
 
 async def run_bot(room_url: str, token: str, session_id: str, driver_number: str):
+    # Initialize session manager
+    session_manager = get_session_manager()
+    
+    # Create session with initial data
+    await session_manager.create_session(
+        session_id=session_id,
+        initial_data={
+            "driver_number": driver_number,
+            "conversation_count": 0
+        }
+    )
+    logger.info(f"Session {session_id} initialized for driver {driver_number}")
 
     # (url, token, room_name) = await configure()
 
@@ -161,10 +175,20 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     context_aggregator = agent_for_not_getting_rides.create_context_aggregator(context)
 
 
-    # Register function handlers
-    agent_for_not_getting_rides.register_function("get_driver_info", get_driver_info_handler)
-    agent_for_not_getting_rides.register_function("send_dummy_request", send_dummy_notification_handler)
-    agent_for_not_getting_rides.register_function("send_overlay_sms", send_overlay_sms_handler)
+    # Register function handlers with session_id captured in closure
+    # Create wrapper functions that have access to session_id
+    async def get_driver_info_wrapper(params):
+        return await get_driver_info_handler(params, session_id=session_id)
+    
+    async def send_dummy_notification_wrapper(params):
+        return await send_dummy_notification_handler(params, session_id=session_id)
+    
+    async def send_overlay_sms_wrapper(params):
+        return await send_overlay_sms_handler(params, session_id=session_id)
+    
+    agent_for_not_getting_rides.register_function("get_driver_info", get_driver_info_wrapper)
+    agent_for_not_getting_rides.register_function("send_dummy_request", send_dummy_notification_wrapper)
+    agent_for_not_getting_rides.register_function("send_overlay_sms", send_overlay_sms_wrapper)
 
    
 
@@ -249,6 +273,15 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected")
+        
+        # Update session with connection info
+        await session_manager.set_value(session_id, "connected_at", datetime.now().isoformat())
+        await session_manager.set_value(session_id, "status", "connected")
+        
+        # Example: Retrieve session data
+        session_data = await session_manager.get_session(session_id)
+        logger.info(f"Session data: {session_data}")
+        
         # Kick off the conversation.
         # messages.append({"role": "system", "content": "Say hello and briefly introduce yourself."})
         await task.queue_frames([LLMRunFrame()])
@@ -282,6 +315,18 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
+        
+        # Update session with disconnection info
+        await session_manager.set_value(session_id, "disconnected_at", datetime.now().isoformat())
+        await session_manager.set_value(session_id, "status", "disconnected")
+        
+        # Example: Retrieve final session data before cleanup
+        final_session_data = await session_manager.get_session(session_id)
+        logger.info(f"Final session data: {final_session_data}")
+        
+        # Optionally delete session or keep it for analytics
+        # await session_manager.delete_session(session_id)
+        
         # Stop and save the audio recording
         # audio_recorder.stop_recording() 
         await task.cancel()
