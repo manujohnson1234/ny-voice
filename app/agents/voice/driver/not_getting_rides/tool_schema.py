@@ -13,3 +13,10 @@ send_dummy_request = FunctionSchema(
     properties={},
     required=[]
 )
+
+send_overlay_sms = FunctionSchema(
+    name="send_overlay_sms",
+    description="Send overlay SMS to a driver for dues payment",
+    properties={},
+    required=[]
+)

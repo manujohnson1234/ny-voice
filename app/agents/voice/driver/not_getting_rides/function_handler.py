@@ -24,14 +24,20 @@ async def call_mcp_tool(tool_name: str, parameters: dict = None):
 async def get_driver_info_handler(params: FunctionCallParams):
     """Handler for get_driver_info tool"""
     # logger.info(f"get_driver_info_handler called with mobileNumber: {mobile_number}")
-    mobile_number = "8610263112"
+    mobile_number = "6361081210"
     result = await call_mcp_tool("get_driver_info", {"mobile_number": mobile_number})
     await params.result_callback(result)
 
 async def send_dummy_notification_handler(params: FunctionCallParams):
     """Handler for send_dummy_notification tool"""
     # logger.info(f"send_dummy_notification_handler called with driver_id: {params.parameters}")
-    driver_id = "60580e5a-a7fe-4169-87ed-0b80eddf09ea"
+    driver_id = "07113691-db0a-421c-b3a4-b200f2644cd4"
     result = await call_mcp_tool("send_dummy_notification", {"driver_id": driver_id})
     await params.result_callback(result)
-    
+
+
+async def send_overlay_sms_handler(params: FunctionCallParams):
+    """Handler for send_dues_overlay tool"""
+    driver_id = "07113691-db0a-421c-b3a4-b200f2644cd4"
+    result = await call_mcp_tool("send_overlay_sms", {"driver_id": driver_id})
+    await params.result_callback(result)
