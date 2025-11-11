@@ -17,7 +17,12 @@ async def call_mcp_tool(tool_name: str, parameters: dict = None):
             }
             response = await client.post(f"{MCP_SERVER_URL}/call-tool", json=payload)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            if isinstance(data, dict):
+                nested_result = data.get("result")
+                if isinstance(nested_result, dict):
+                    return nested_result
+            return data
         except Exception as e:
             logger.error(f"Error calling MCP tool {tool_name}: {e}")
             return {"success": False, "error": f"Failed to call {tool_name}: {str(e)}"}
@@ -36,6 +41,13 @@ async def get_driver_info_handler(params: FunctionCallParams, session_id: str = 
         await params.result_callback(error_result)
         return
     
+    count_tool_calls = await session_manager.get_value(session_id, "count_tool_calls")
+    count_tool_calls["get_driver_info"] = count_tool_calls.get("get_driver_info", 0) + 1
+    if count_tool_calls["get_driver_info"] > 3:
+        await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
+        await session_manager.set_value(session_id, "reason", "error_due_to_mcp_or_common")
+        return
+    
     driver_number = await session_manager.get_value(session_id, "driver_number")
     if not driver_number:
         logger.error(f"driver_number not found in session {session_id}")
@@ -51,6 +63,13 @@ async def get_driver_info_handler(params: FunctionCallParams, session_id: str = 
     
     result = await call_mcp_tool("get_driver_info", {"mobile_number": mobile_number})
 
+    if isinstance(result, dict):
+        if result.get("success") == False:
+            logger.info("error in get_driver_info result")
+            await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
+            await session_manager.set_value(session_id, "reason", "error_due_to_mcp_or_common")
+            return
+
     logger.info(f"Result from get_driver_info: {result}")
     
     # Extract driverId from result and store in session
@@ -59,9 +78,9 @@ async def get_driver_info_handler(params: FunctionCallParams, session_id: str = 
         driver_id = None
         if isinstance(result, dict):
             # Check if result has a nested 'result' key
-            nested_result = result.get("result", {})
-            if isinstance(nested_result, dict):
-                driver_id = nested_result.get("driverId")
+            # nested_result = result.get("result", {})
+            # if isinstance(nested_result, dict):
+            driver_id = result.get("driverId")
             
             # Also check top level in case structure is different
             if not driver_id:
@@ -89,6 +108,14 @@ async def send_dummy_notification_handler(params: FunctionCallParams, session_id
         await params.result_callback(error_result)
         return
     
+    count_tool_calls = await session_manager.get_value(session_id, "count_tool_calls")
+    count_tool_calls["send_dummy_notification"] = count_tool_calls.get("send_dummy_notification", 0) + 1
+    if count_tool_calls["send_dummy_notification"] > 3:
+        await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
+        await session_manager.set_value(session_id, "reason", "error_due_to_mcp_or_common")
+        return
+    
+    
     driver_id = await session_manager.get_value(session_id, "driver_id")
     if not driver_id:
         logger.error(f"driver_id not found in session {session_id}")
@@ -101,6 +128,11 @@ async def send_dummy_notification_handler(params: FunctionCallParams, session_id
     
     logger.info(f"Retrieved driver_id {driver_id} from session {session_id}")
     result = await call_mcp_tool("send_dummy_notification", {"driver_id": driver_id})
+    if isinstance(result, dict):
+        if result.get("success") == False:
+            await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
+            await session_manager.set_value(session_id, "reason", "error_due_to_mcp_or_common")
+            return
     await params.result_callback(result)
 
 
@@ -117,6 +149,13 @@ async def send_overlay_sms_handler(params: FunctionCallParams, session_id: str =
         }
         await params.result_callback(error_result)
         return
+
+    count_tool_calls = await session_manager.get_value(session_id, "count_tool_calls")
+    count_tool_calls["send_overlay_sms"] = count_tool_calls.get("send_overlay_sms", 0) + 1
+    if count_tool_calls["send_overlay_sms"] > 3:
+        await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
+        await session_manager.set_value(session_id, "reason", "error_due_to_mcp_or_common")
+        return
     
     driver_id = await session_manager.get_value(session_id, "driver_id")
     if not driver_id:
@@ -130,4 +169,19 @@ async def send_overlay_sms_handler(params: FunctionCallParams, session_id: str =
     
     logger.info(f"Retrieved driver_id {driver_id} from session {session_id}")
     result = await call_mcp_tool("send_overlay_sms", {"driver_id": driver_id})
-    await params.result_callback(result)
+    if isinstance(result, dict):
+        if result.get("success") == False:
+            await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
+            await session_manager.set_value(session_id, "reason", "error_due_to_mcp_or_common")
+            return
+    await params.result_callback(result)     
+
+
+
+async def bot_fail_to_resolve_handler(params: FunctionCallParams, session_id: str = None):
+    """Handler for bot_fail_to_resolve tool"""
+    session_manager = get_session_manager()
+    await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
+    await session_manager.set_value(session_id, "reason", "driver_asked_to_call_agent")
+    return
+    
