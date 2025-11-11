@@ -20,3 +20,10 @@ send_overlay_sms = FunctionSchema(
     properties={},
     required=[]
 )
+
+bot_fail_to_resolve = FunctionSchema(
+    name="bot_fail_to_resolve",
+    description="Bot failed to resolve the issue",
+    properties={},
+    required=[]
+)

@@ -39,6 +39,12 @@ from pipecat.transports.livekit.transport import LiveKitParams, LiveKitTransport
 from pipecat.services.openai.stt import OpenAISTTService
 
 
+from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
+from pipecat.frames.frames import TTSSpeakFrame
+
+from pipecat.processors.frame_processor import FrameProcessor
+from pipecat.frames.frames import BotStoppedSpeakingFrame
+
 
 from google.cloud.speech_v1 import RecognitionConfig
 
@@ -46,9 +52,14 @@ from loguru import logger
 
 # from app.agents.voice.driver.router_agent.system_prompt import router_agent_system_prompt
 
-from app.agents.voice.driver.not_getting_rides.tool_schema import driver_info, send_dummy_request, send_overlay_sms
+from app.agents.voice.driver.not_getting_rides.tool_schema import driver_info, send_dummy_request, send_overlay_sms,bot_fail_to_resolve
 from app.agents.voice.driver.not_getting_rides.system_prompt import not_getting_rides_system_prompt
-from app.agents.voice.driver.not_getting_rides.function_handler import get_driver_info_handler, send_dummy_notification_handler, send_overlay_sms_handler
+from app.agents.voice.driver.not_getting_rides.function_handler import get_driver_info_handler, send_dummy_notification_handler, send_overlay_sms_handler,bot_fail_to_resolve_handler
+
+from app.agents.voice.driver.utils.handover import HandoverFrame
+
+from app.agents.voice.driver.utils.bot_words import bot_words
+
 # from stt_debug import STTDebugProcessor
 # from audio_recorder import AudioRecorderProcessor
 
@@ -60,6 +71,8 @@ from app.agents.voice.driver.not_getting_rides.function_handler import get_drive
 # from app.agents.voice.driver.router_class.agent_router import AgentRouter, AgentConfig
 from app.core import config
 from app.core.session_manager import get_session_manager
+from app.core.session_manager import SessionManager
+
 
 
 load_dotenv(override=True)
@@ -74,7 +87,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         session_id=session_id,
         initial_data={
             "driver_number": driver_number,
-            "conversation_count": 0
+            "count_tool_calls": {}
         }
     )
     logger.info(f"Session {session_id} initialized for driver {driver_number}")
@@ -167,7 +180,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     agent_for_not_getting_rides = OpenAILLMService(api_key=config.OPENAI_API_KEY)
 
 
-    tools = ToolsSchema(standard_tools=[driver_info,send_dummy_request,send_overlay_sms])
+    tools = ToolsSchema(standard_tools=[driver_info,send_dummy_request,send_overlay_sms,bot_fail_to_resolve])
 
     messages = not_getting_rides_system_prompt
 
@@ -186,11 +199,13 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     async def send_overlay_sms_wrapper(params):
         return await send_overlay_sms_handler(params, session_id=session_id)
     
+    async def bot_fail_to_resolve_wrapper(params):
+        return await bot_fail_to_resolve_handler(params, session_id=session_id)
+
     agent_for_not_getting_rides.register_function("get_driver_info", get_driver_info_wrapper)
     agent_for_not_getting_rides.register_function("send_dummy_request", send_dummy_notification_wrapper)
     agent_for_not_getting_rides.register_function("send_overlay_sms", send_overlay_sms_wrapper)
-
-   
+    agent_for_not_getting_rides.register_function("bot_fail_to_resolve", bot_fail_to_resolve_wrapper)
 
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
@@ -245,6 +260,8 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     # Create STT debug processor
     # stt_debug = STTDebugProcessor()
 
+    # completionListener = CompletionListener(session_id, session_manager)
+    handoverFrame = HandoverFrame(session_id, session_manager)
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
@@ -257,6 +274,8 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
             # routerLLM,
             tts,  # TTS
             transport.output(),  # Transport bot output
+            # completionListener,
+            handoverFrame,
             context_aggregator.assistant(),  # Assistant spoken responses
         ]
     )
@@ -270,8 +289,40 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         observers=[RTVIObserver(rtvi)],
     )
 
+    # Timer task variable to store the background timer
+    timer_task = None
+
+    # Timer callback function
+    async def on_timer_expired(session_id: str, task: PipelineTask):
+        """Callback function called when the 3-minute timer expires."""
+        logger.info(f"3-minute timer expired for session {session_id}")
+        await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
+        await session_manager.set_value(session_id, "reason", "time_out_error")
+
+        # Additional actions can be added here
+    
+    
+    @handoverFrame.event_handler("on_end_call")
+    async def on_end_call(handoverFrame):
+        logger.info("End call")
+        await session_manager.delete_session(session_id)
+        await task.queue_frames([CancelFrame()])
+        await task.cancel()
+
+
+    @handoverFrame.event_handler("on_bot_fail_to_resolve")
+    async def on_bot_fail_to_resolve(handoverFrame):
+        logger.info("Bot failed to resolve")
+        sentence = await session_manager.get_value(session_id, "reason")
+        await task.queue_frames([TTSSpeakFrame(bot_words[sentence])])
+        await task.queue_frames([RTVIServerMessageFrame(data={"event": "on_bot_fail_to_resolve"})])
+        await session_manager.set_value(session_id, "end_call", "true")
+
+
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
+        nonlocal timer_task
         logger.info("Client connected")
         
         # Update session with connection info
@@ -282,9 +333,15 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         session_data = await session_manager.get_session(session_id)
         logger.info(f"Session data: {session_data}")
         
-        # Kick off the conversation.
-        # messages.append({"role": "system", "content": "Say hello and briefly introduce yourself."})
         await task.queue_frames([LLMRunFrame()])
+
+        # Start 3-minute timer
+        async def timer_function():
+            await asyncio.sleep(190)  # 3 minutes
+            await on_timer_expired(session_id, task)
+
+        timer_task = asyncio.create_task(timer_function())
+        logger.info(f"Started 3-minute timer for session {session_id}")
 
 
     # @routerLLM.event_handler("on_agent_switched")
@@ -314,6 +371,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
+        nonlocal timer_task
         logger.info("Client disconnected")
         
         # Update session with disconnection info
@@ -326,6 +384,14 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         
         # Optionally delete session or keep it for analytics
         # await session_manager.delete_session(session_id)
+        
+        # Cancel timer if it's still running
+        if timer_task and not timer_task.done():
+            timer_task.cancel()
+            try:
+                await timer_task
+            except asyncio.CancelledError:
+                logger.info(f"Timer cancelled for session {session_id}")
         
         # Stop and save the audio recording
         # audio_recorder.stop_recording() 
