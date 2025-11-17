@@ -42,5 +42,11 @@ SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY")
 ENABLE_KOALA_FILTER = os.environ.get("ENABLE_KOALA_FILTER", "false").lower() == "true"
 ENABLE_AIC_FILTER = os.environ.get("ENABLE_AIC_FILTER", "false").lower() == "true"
 
+AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
+ENABLE_RECORDING = os.environ.get("ENABLE_RECORDING", "false").lower() == "true"
+S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "ny-voicebot-recordings")
+ENABLE_S3_STORAGE = os.environ.get("ENABLE_S3_STORAGE", "false").lower() == "true"
+ENABLE_LOCAL_STORAGE = os.environ.get("ENABLE_LOCAL_STORAGE", "false").lower() == "true"
+
 
 MAX_SESSION_TIME = 5 * 60  # seconds or whatever you want
