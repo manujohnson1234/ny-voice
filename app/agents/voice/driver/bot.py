@@ -1,9 +1,13 @@
 import argparse
 import asyncio
+import io
 import os
 import sys
+import wave
 from datetime import datetime
 from pathlib import Path
+import aiofiles
+import boto3
 
 
 project_root = Path(__file__).parent.parent.parent.parent.parent
@@ -29,11 +33,15 @@ from pipecat.transcriptions.language import Language
 from pipecat.frames.frames import FilterEnableFrame, CancelFrame, LLMContextFrame
 
 from pipecat.audio.filters.koala_filter import KoalaFilter
+from pipecat.audio.filters.aic_filter import AICFilter
+
 from pipecat.frames.frames import FilterEnableFrame
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 
 from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
 from pipecat.frames.frames import TTSSpeakFrame
+
+from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 
 from loguru import logger
 
@@ -55,6 +63,56 @@ from app.core.session_manager import SessionManager
 
 
 load_dotenv(override=True)
+
+
+
+
+def upload_to_s3_from_memory(audio_data: bytes, bucket_name: str, object_key: str):
+    """Upload audio data directly from memory to S3 using boto3."""
+    s3 = boto3.client('s3', region_name=config.AWS_REGION)
+    with io.BytesIO(audio_data) as buffer:
+        buffer.seek(0)  # Reset buffer position to start
+        s3.upload_fileobj(buffer, bucket_name, object_key)
+    logger.info(f"Audio uploaded successfully to s3://{bucket_name}/{object_key}")
+
+
+async def save_audio_file(audio: bytes, filename: str, sample_rate: int, num_channels: int):
+    """Save audio data to a WAV file locally and optionally to S3. Both operations are independent."""
+    if len(audio) > 0 :
+        with io.BytesIO() as buffer:
+            with wave.open(buffer, "wb") as wf:
+                wf.setsampwidth(2)
+                wf.setnchannels(num_channels)
+                wf.setframerate(sample_rate)
+                wf.writeframes(audio)
+            audio_data = buffer.getvalue()
+            
+            # Save to local file (independent operation)
+            if config.ENABLE_LOCAL_STORAGE:
+                try:
+                    async with aiofiles.open(filename, "wb") as file:
+                        await file.write(audio_data)
+                    logger.info(f"Audio saved to {filename}")
+                except Exception as e:
+                    logger.error(f"Failed to save audio to local file: {e}")
+
+            
+            # Upload to S3 if enabled (independent operation - doesn't depend on local file)
+            if config.ENABLE_S3_STORAGE:
+                try:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    object_key = filename
+                    
+                    # Upload to S3 directly from memory buffer (independent from local save)
+                    await asyncio.to_thread(
+                        upload_to_s3_from_memory,
+                        audio_data,
+                        config.S3_BUCKET_NAME,
+                        object_key
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to upload audio to S3: {e}")
+
 
 
 async def run_bot(room_url: str, token: str, session_id: str, driver_number: str):
@@ -156,6 +214,8 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     # Create STT debug processor
     # stt_debug = STTDebugProcessor()
 
+    audiobuffer = AudioBufferProcessor()
+
     # completionListener = CompletionListener(session_id, session_manager)
     handoverFrame = HandoverFrame(session_id, session_manager)
     pipeline = Pipeline(
@@ -169,6 +229,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
             agent_for_not_getting_rides,  # LLM
             tts,  # TTS
             transport.output(),  # Transport bot output
+            audiobuffer,
             handoverFrame,
             context_aggregator.assistant(),  # Assistant spoken responses
         ]
@@ -228,6 +289,8 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         # Example: Retrieve session data
         session_data = await session_manager.get_session(session_id)
         logger.info(f"Session data: {session_data}")
+
+        await audiobuffer.start_recording()
     
         await task.queue_frames([LLMRunFrame()])
 
@@ -238,6 +301,20 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 
         timer_task = asyncio.create_task(timer_function())
         logger.info(f"Started 3-minute timer for session {session_id}")
+
+
+    
+    @audiobuffer.event_handler("on_audio_data")
+    async def in_audio_data(buffer, audio, sample_rate, num_channels):
+        if config.ENABLE_RECORDING:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"recordings/{driver_number}_{timestamp}.wav"
+            if config.ENABLE_LOCAL_STORAGE:
+                os.makedirs("recordings", exist_ok=True)
+            await save_audio_file(audio, filename, sample_rate, num_channels)
+        else:
+            logger.info("Audio recording is disabled")
+
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
