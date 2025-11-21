@@ -170,14 +170,6 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
-    # Create audio recorder to save incoming audio
-    # audio_recorder = AudioRecorderProcessor(
-    #     output_dir="recordings",
-    #     session_id=session_id,
-    #     sample_rate=16000,  # Match your audio configuration
-    #     channels=1,
-    #     sample_width=2
-    # )
 
     # @llm.event_handler("on_function_calls_started")
     # async def on_function_calls_started(llm, function_calls):
@@ -198,7 +190,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     if (config.ENABLE_KOALA_FILTER):
         daily_params.audio_in_filter = KoalaFilter(access_key=config.KOALA_ACCESS_KEY)
     elif (config.ENABLE_AIC_FILTER):
-        daily_params.audio_in_filter  = AICFilter(license_key=config.AIC_ACCESS_KEY)
+        daily_params.audio_in_filter  = AICFilter(license_key=config.AIC_ACCESS_KEY,enhancement_level=1.0)
 
 
 
@@ -216,12 +208,10 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 
     audiobuffer = AudioBufferProcessor()
 
-    # completionListener = CompletionListener(session_id, session_manager)
     handoverFrame = HandoverFrame(session_id, session_manager)
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
-            # audio_recorder,  # Record incoming audio for debugging
             rtvi,  # RTVI processor
             stt,
             # stt_debug,  # STT output for debugging
@@ -337,8 +327,6 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
             except asyncio.CancelledError:
                 logger.info(f"Timer cancelled for session {session_id}")
         
-        # Stop and save the audio recording
-        # audio_recorder.stop_recording() 
         await task.cancel()
 
     runner = PipelineRunner()
