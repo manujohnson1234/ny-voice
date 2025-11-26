@@ -1,6 +1,10 @@
 """Configuration settings for the MCP server."""
 import os
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class APIConfig:
@@ -14,22 +18,22 @@ class APIConfig:
     OVERLAY_API_URL = "https://dashboard.beckn.juspay.in/api/bpp/driver-offer/NAMMA_YATRI_PARTNER/driver/{}/sendSms"
     
     # API Keys
-    DRIVER_INFO_API_KEY = os.getenv("DRIVER_INFO_API_KEY", "add9b7b9-4a84-4abb-abf5-189469c7df3d")
-    SEARCH_REQUEST_API_KEY = os.getenv("SEARCH_REQUEST_API_KEY", "5931f977-8a9c-4ad1-81f3-ccfa14f3db22")
-    DUMMY_NOTIFICATION_API_KEY = os.getenv("DUMMY_NOTIFICATION_API_KEY", "5931f977-8a9c-4ad1-81f3-ccfa14f3db22")
-    SUBSCRIPTION_API_KEY = os.getenv("SUBSCRIPTION_API_KEY", "5931f977-8a9c-4ad1-81f3-ccfa14f3db22")
-    OVERLAY_API_KEY = os.getenv("OVERLAY_API_URL_KEY", "5931f977-8a9c-4ad1-81f3-ccfa14f3db22")
+    DRIVER_INFO_API_KEY = os.getenv("DRIVER_INFO_API_KEY", "")
+    DASHBOARD_TOKEN = os.getenv("DASHBOARD_TOKEN", "")
     
     # Constants
     CONTENT_TYPE_JSON = "application/json"
 
+    ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
+
+    TIME_INTERVAL = os.getenv("TIME_INTERVAL", "40")
 
 class ClickHouseConfig:
     """ClickHouse database configuration."""
     
-    HOST = os.getenv("CLICKHOUSE_HOST", "10.6.155.14")
-    USER = os.getenv("CLICKHOUSE_USER", "juspay_ro")
-    PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "hARCGXR9lFsDMWhS")
+    HOST = os.getenv("CLICKHOUSE_HOST")
+    USER = os.getenv("CLICKHOUSE_USER")
+    PASSWORD = os.getenv("CLICKHOUSE_PASSWORD")
     PORT = int(os.getenv("CLICKHOUSE_PORT", "9000"))
 
 

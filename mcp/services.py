@@ -11,6 +11,8 @@ from api_clients import (
 from database import clickhouse_client
 from block_messages import get_blocked_reason_message
 
+from config import APIConfig
+
 
 class DriverService:
     """Service for driver-related operations."""
@@ -92,14 +94,11 @@ class DriverService:
             if has_dues:
                 dues_details["driverId"] = driver_id
                 return dues_details
-        
-        # Query ClickHouse for search requests
-        clickhouse_results = clickhouse_client.query_search_requests(driver_id, minutes_back=30)
-        
+
         # Fetch search requests from API
         search_response = self.search_request_client.get_search_requests(
             driver_id,
-            minutes_back=10,
+            minutes_back=int(APIConfig.TIME_INTERVAL),
             limit=5
         )
         
@@ -107,14 +106,28 @@ class DriverService:
         if search_response.get("success"):
             search_requests_count = search_response.get("count", 0)
         
+        # Query ClickHouse for search requests
+        clickhouse_results_count = 0
+        if APIConfig.ENVIRONMENT != "master":
+            clickhouse_results_count = clickhouse_client.query_search_requests(driver_id, minutes_back=int(APIConfig.TIME_INTERVAL))
+        
+        
+        
+        
         # Combine results
-        combined_response = {
-            "success": True,
-            "no_search_requests": search_requests_count,
-            "driverId": driver_id,
-            "clickhouse_search_requests": clickhouse_results,
-            "clickhouse_search_requests_count": len(clickhouse_results)
-        }
+        if APIConfig.ENVIRONMENT != "master":
+            combined_response = {
+                "success": True,
+                "no_search_requests": search_requests_count,
+                "driverId": driver_id,
+                "driver_considered_for_search_request_count": clickhouse_results_count
+            }
+        else:
+            combined_response = {
+                "success": True,
+                "no_search_requests": search_requests_count,
+                "driverId": driver_id
+            }
         
         logger.info(f"Driver info retrieved successfully for driverId: {driver_id}")
         return combined_response

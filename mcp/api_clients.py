@@ -56,7 +56,7 @@ class SearchRequestClient:
     @staticmethod
     def get_search_requests(
         driver_id: str,
-        minutes_back: int = 10,
+        minutes_back: int = 40,
         limit: int = 5
     ) -> Dict[str, Any]:
         """
@@ -71,7 +71,7 @@ class SearchRequestClient:
             Dictionary containing search requests
         """
         headers = {
-            "token": APIConfig.SEARCH_REQUEST_API_KEY,
+            "token": APIConfig.DASHBOARD_TOKEN,
             "Content-Type": APIConfig.CONTENT_TYPE_JSON,
         }
         
@@ -98,12 +98,12 @@ class SearchRequestClient:
             if resp.status_code != 200:
                 logger.warning(f"Search request failed for driverId {driver_id}: {resp.status_code}")
                 return {"success": False, "error": f"Search request API failed with status {resp.status_code}"}
+
             
             search_data = resp.json()
-            search_requests = search_data.get(
-                'data', 
-                search_data.get('results', search_data.get('searchRequests', []))
-            )
+
+            search_requests = search_data.get('searchrequests', [])
+
             
             count = 0
             if isinstance(search_requests, list):
@@ -133,7 +133,7 @@ class NotificationClient:
             Dictionary containing API response
         """
         headers = {
-            "token": APIConfig.DUMMY_NOTIFICATION_API_KEY,
+            "token": APIConfig.DASHBOARD_TOKEN,
             "Content-Type": APIConfig.CONTENT_TYPE_JSON,
         }
         
@@ -178,7 +178,7 @@ class NotificationClient:
             Dictionary containing API response
         """
         headers = {
-            "token": APIConfig.OVERLAY_API_KEY,
+            "token": APIConfig.DASHBOARD_TOKEN,
             "Content-Type": APIConfig.CONTENT_TYPE_JSON,
         }
         
@@ -233,7 +233,7 @@ class SubscriptionClient:
             Dictionary containing subscription information
         """
         headers = {
-            "token": APIConfig.SUBSCRIPTION_API_KEY,
+            "token": APIConfig.DASHBOARD_TOKEN,
             "Content-Type": APIConfig.CONTENT_TYPE_JSON,
         }
         
