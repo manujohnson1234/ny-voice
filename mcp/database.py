@@ -41,14 +41,14 @@ class ClickHouseClient:
     def query_search_requests(
         self, 
         driver_id: str, 
-        minutes_back: int = 10
+        minutes_back: int = 40
     ) -> List[List]:
         """
         Query search requests from ClickHouse for a specific driver.
         
         Args:
             driver_id: The driver ID to search for
-            minutes_back: Number of minutes to look back (default: 10)
+            minutes_back: Number of minutes to look back (default: 40)
         
         Returns:
             List of search request records (as lists for JSON serialization)
@@ -62,33 +62,23 @@ class ClickHouseClient:
             logger.error("driver_id is required for ClickHouse query")
             return []
         
-        # Use Indian Standard Time (IST = UTC+5:30)
-        ist = timezone(timedelta(hours=5, minutes=30))
-        now = datetime.now(ist)
-        time_from = now - timedelta(minutes=minutes_back)
-        
-        # ClickHouse-compatible timestamp format (NO "Z")
-        to_time = now.strftime("%Y-%m-%d %H:%M:%S")
-        from_time = time_from.strftime("%Y-%m-%d %H:%M:%S")
-        
-        logger.debug(f"Querying ClickHouse: FROM={from_time}, TO={to_time}")
-        
         try:
             # Escape single quotes in driver_id to prevent SQL injection
             escaped_driver_id = driver_id.replace("'", "''")
             
+            # Use ClickHouse's now() function (UTC) with INTERVAL for time range
             rows = client.execute(f"""
                 SELECT *
                 FROM atlas_kafka.search_request_batch
                 WHERE has(driverIds, '{escaped_driver_id}')
-                  AND date BETWEEN '{from_time}' AND '{to_time}'
+                  AND date BETWEEN now() - INTERVAL {minutes_back} MINUTE AND now()
                 ORDER BY date
             """)
             
             logger.debug(f"ClickHouse query returned {len(rows)} rows for driver_id: {driver_id}")
             
             # Convert tuples to lists for JSON serialization
-            return [list(row) for row in rows]
+            return len(rows)
         except Exception as e:
             logger.error(f"ClickHouse query failed: {str(e)}")
             return []
