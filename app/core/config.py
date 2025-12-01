@@ -1,4 +1,5 @@
 import os
+import base64
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -48,5 +49,17 @@ S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "ny-voicebot-recordings")
 ENABLE_S3_STORAGE = os.environ.get("ENABLE_S3_STORAGE", "false").lower() == "true"
 ENABLE_LOCAL_STORAGE = os.environ.get("ENABLE_LOCAL_STORAGE", "false").lower() == "true"
 
+
+OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+OTEL_EXPORTER_OTLP_HEADERS = os.getenv("OTEL_EXPORTER_OTLP_HEADERS", "Authorization=Bearer <your-api-key>")
+
+LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY")
+LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
+
+LANGFUSE_AUTH = base64.b64encode(f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()).decode()
+os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "http://localhost:3000/api/public/otel"
+os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {LANGFUSE_AUTH}"
+
+TIME_RESTRICTED_FOR_BOT = os.environ.get("TIME_RESTRICTED_FOR_BOT", "190")
 
 MAX_SESSION_TIME = 5 * 60  # seconds or whatever you want
