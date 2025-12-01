@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.schemas import DriverParams
+from app.schemas import DriverParams, LanguageCode
 
 import aiohttp
 
@@ -53,8 +53,22 @@ async def driver_voice_connect(request: DriverParams):
     logger.info(f"Driver connected params: {request}")
 
     driver_number = request.phoneNumber
+    language_code = request.language_code
+    current_version_of_app = request.current_version_of_app
+    latest_version_of_app = request.latest_version_of_app
 
+    logger.info(f"Language code: {language_code}")
 
+    language_code = 'hi'
+    current_version_of_app = '1.0.0'
+    latest_version_of_app = '1.0.0'
+
+    if not driver_number:
+        return JSONResponse({"error": "Driver number is required"}, status_code=400)
+
+    if language_code not in [lang.value for lang in LanguageCode]:
+        return JSONResponse({"error": "Invalid language code"}, status_code=400)
+    
     daily_room_properties = DailyRoomProperties(
         exp=time.time() + MAX_SESSION_TIME,
         eject_at_room_exp=True,
@@ -97,6 +111,15 @@ async def driver_voice_connect(request: DriverParams):
 
     if driver_number:
         cmd += ["--driver-number", driver_number]
+
+    if current_version_of_app:
+        cmd += ["--current-version-of-app", current_version_of_app if current_version_of_app else '']
+
+    if latest_version_of_app:
+        cmd += ["--latest-version-of-app", latest_version_of_app if latest_version_of_app else '']
+
+    if language_code:
+        cmd += ["--language-code", language_code if language_code else 'kn']
 
     logger.info(f"Starting voice agent with command: {cmd}")
 

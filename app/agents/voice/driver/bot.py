@@ -17,7 +17,8 @@ from dotenv import load_dotenv
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask,PipelineParams
-from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecat.transports.daily.transport import DailyParams, DailyTransport
+
 
 
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
@@ -60,6 +61,7 @@ from app.core import config
 from app.core.session_manager import get_session_manager
 from app.core.session_manager import SessionManager
 
+from app.agents.voice.driver.analytics.tracing_setup import setup_tracing
 
 
 load_dotenv(override=True)
@@ -115,7 +117,9 @@ async def save_audio_file(audio: bytes, filename: str, sample_rate: int, num_cha
 
 
 
-async def run_bot(room_url: str, token: str, session_id: str, driver_number: str):
+
+
+async def run_bot(room_url: str, token: str, session_id: str, driver_number: str, language_code: str, current_version_of_app: str, latest_version_of_app: str):
     # Initialize session manager
     session_manager = get_session_manager()
     
@@ -124,23 +128,24 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         session_id=session_id,
         initial_data={
             "driver_number": driver_number,
+            "language_code": language_code,
+            "current_version_of_app": current_version_of_app,
+            "latest_version_of_app": latest_version_of_app,
             "count_tool_calls": {}
         }
     )
     logger.info(f"Session {session_id} initialized for driver {driver_number}")
-
-    language = "hi" 
     
-    stt = get_stt_service(language=language) # for malayalam use sarvam 
+    stt = get_stt_service(language=language_code) 
 
-    tts = get_tts_service(language=language) 
+    tts = get_tts_service(language=language_code) 
 
     agent_for_not_getting_rides = get_llm_service()
 
 
     tools = ToolsSchema(standard_tools=[driver_info,send_dummy_request,send_overlay_sms,bot_fail_to_resolve])
 
-    messages = get_not_getting_rides_system_prompt(language=language)
+    messages = get_not_getting_rides_system_prompt(language=language_code)
     
     
 
@@ -225,12 +230,19 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         ]
     )
 
+
+    setup_tracing(
+        service_name="ny-driver-bot",
+    )
+
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        enable_tracing=True,
+        enable_turn_tracking=True,
         observers=[RTVIObserver(rtvi)],
     )
 
@@ -259,7 +271,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     async def on_bot_fail_to_resolve(handoverFrame):
         logger.info("Bot failed to resolve")
         sentence = await session_manager.get_value(session_id, "reason")
-        message = get_bot_words(language=language, key=sentence)
+        message = get_bot_words(language=language_code, key=sentence)
         logger.info(f"Bot words: {message}")
         await task.queue_frames([TTSSpeakFrame(message)])
         await task.queue_frames([RTVIServerMessageFrame(data={"event": "on_bot_fail_to_resolve"})])
@@ -275,7 +287,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         # Update session with connection info
         await session_manager.set_value(session_id, "connected_at", datetime.now().isoformat())
         await session_manager.set_value(session_id, "status", "connected")
-        
+
         # Example: Retrieve session data
         session_data = await session_manager.get_session(session_id)
         logger.info(f"Session data: {session_data}")
@@ -286,7 +298,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 
         # Start 3-minute timer
         async def timer_function():
-            await asyncio.sleep(190)  # 3 minutes
+            await asyncio.sleep(int(config.TIME_RESTRICTED_FOR_BOT))  # 3 minutes
             await on_timer_expired(session_id, task)
 
         timer_task = asyncio.create_task(timer_function())
@@ -346,9 +358,12 @@ def parse_args():
         "--session-id", type=str, required=True, help="Session ID for logging"
     )
     parser.add_argument("--driver-number", type=str, required=True, help="Driver number")
+    parser.add_argument("--language-code", type=str, required=True, help="Language code")
+    parser.add_argument("--current-version-of-app", type=str, required=True, help="Current version of app")
+    parser.add_argument("--latest-version-of-app", type=str, required=True, help="Latest version of app")
 
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
-    asyncio.run(run_bot(args.url, args.token, args.session_id, args.driver_number))
+    asyncio.run(run_bot(args.url, args.token, args.session_id, args.driver_number, args.language_code, args.current_version_of_app, args.latest_version_of_app))
