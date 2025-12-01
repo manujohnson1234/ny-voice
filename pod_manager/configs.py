@@ -52,5 +52,23 @@ MAX_SESSION_TIME = 5 * 60  # seconds or whatever you want
 
 
 ROUTER_URL = os.environ.get("ROUTER_URL", "http://router:8082")
-POD_NAME = os.environ.get("POD_NAME")
-POD_IP = os.environ.get("POD_IP")
+MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
+
+
+
+REDIS_KEY_WARM_PODS = os.environ.get("REDIS_KEY_WARM_PODS", "ny-voice-warm-pods")
+REDIS_KEY_ACTIVE_PODS = os.environ.get("REDIS_KEY_ACTIVE_PODS", "ny-voice-active-pods")
+NAMESPACE = os.environ.get("NAMESPACE", "ny-voicebot")
+IMAGE = os.environ.get("IMAGE", "")
+MIN_IDLE = int(os.environ.get("MIN_IDLE", "3"))
+MAX_POD = int(os.environ.get("MAX_POD", "20"))
+
+POD_CPU_MASTER=os.environ.get("POD_CPU_MASTER", "1")
+POD_MEM_MASTER=os.environ.get("POD_MEM_MASTER", "512Mi")
+
+POD_CPU_PROD=os.environ.get("PROD_CPU_PRODUCER", "0.5")
+POD_MEM_PROD=os.environ.get("POD_MEM_PRODUCER", "512Mi")
+
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
+REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
