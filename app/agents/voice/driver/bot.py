@@ -115,7 +115,7 @@ async def save_audio_file(audio: bytes, filename: str, sample_rate: int, num_cha
 
 
 
-async def run_bot(room_url: str, token: str, session_id: str, driver_number: str):
+async def run_bot(room_url: str, token: str, session_id: str, driver_number: str, language_code: str, current_version_of_app: str, latest_version_of_app: str):
     # Initialize session manager
     session_manager = get_session_manager()
     
@@ -129,18 +129,17 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     )
     logger.info(f"Session {session_id} initialized for driver {driver_number}")
 
-    language = "hi" 
     
-    stt = get_stt_service(language=language) # for malayalam use sarvam 
+    stt = get_stt_service(language=language_code) # for malayalam use sarvam 
 
-    tts = get_tts_service(language=language) 
+    tts = get_tts_service(language=language_code) 
 
     agent_for_not_getting_rides = get_llm_service()
 
 
     tools = ToolsSchema(standard_tools=[driver_info,send_dummy_request,send_overlay_sms,bot_fail_to_resolve])
 
-    messages = get_not_getting_rides_system_prompt(language=language)
+    messages = get_not_getting_rides_system_prompt(language=language_code)
     
     
 
@@ -259,7 +258,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     async def on_bot_fail_to_resolve(handoverFrame):
         logger.info("Bot failed to resolve")
         sentence = await session_manager.get_value(session_id, "reason")
-        message = get_bot_words(language=language, key=sentence)
+        message = get_bot_words(language=language_code, key=sentence)
         logger.info(f"Bot words: {message}")
         await task.queue_frames([TTSSpeakFrame(message)])
         await task.queue_frames([RTVIServerMessageFrame(data={"event": "on_bot_fail_to_resolve"})])
@@ -346,9 +345,12 @@ def parse_args():
         "--session-id", type=str, required=True, help="Session ID for logging"
     )
     parser.add_argument("--driver-number", type=str, required=True, help="Driver number")
+    parser.add_argument("--language-code", type=str, required=True, help="Language code")
+    parser.add_argument("--current-version-of-app", type=str, required=True, help="Current version of app")
+    parser.add_argument("--latest-version-of-app", type=str, required=True, help="Latest version of app")
 
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
-    asyncio.run(run_bot(args.url, args.token, args.session_id, args.driver_number))
+    asyncio.run(run_bot(args.url, args.token, args.session_id, args.driver_number, args.language_code, args.current_version_of_app, args.latest_version_of_app))
