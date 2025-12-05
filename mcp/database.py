@@ -38,11 +38,11 @@ class ClickHouseClient:
             self._client = None
             return None
     
-    def query_search_requests(
+    def query_search_requests_batch(
         self, 
         driver_id: str, 
-        minutes_back: int = 40
-    ) -> List[List]:
+        interval: int = 2
+    ) -> int:
         """
         Query search requests from ClickHouse for a specific driver.
         
@@ -56,11 +56,11 @@ class ClickHouseClient:
         client = self.get_client()
         if client is None:
             logger.warning("ClickHouse client is not available, returning empty results")
-            return []
+            return 0
         
         if not driver_id:
             logger.error("driver_id is required for ClickHouse query")
-            return []
+            return 0
         
         try:
             # Escape single quotes in driver_id to prevent SQL injection
@@ -68,22 +68,83 @@ class ClickHouseClient:
             
             # Use ClickHouse's now() function (UTC) with INTERVAL for time range
             rows = client.execute(f"""
-                SELECT *
+                SELECT COUNT(*)
                 FROM atlas_kafka.search_request_batch
                 WHERE has(driverIds, '{escaped_driver_id}')
-                  AND date BETWEEN now() - INTERVAL {minutes_back} MINUTE AND now()
-                ORDER BY date
+                  AND date BETWEEN now() - INTERVAL {interval} HOUR AND now()
+                  AND filterStage = 'ActualDistance';
             """)
             
             logger.debug(f"ClickHouse query returned {len(rows)} rows for driver_id: {driver_id}")
             
             # Convert tuples to lists for JSON serialization
-            return len(rows)
+            return rows
         except Exception as e:
             logger.error(f"ClickHouse query failed: {str(e)}")
-            return []
+            return 0
+
+    def query_search_requests_for_driver(self, driver_id: str, interval: int = 2) -> int: 
+        """
+        Query search requests from ClickHouse for a specific driver.
+        
+        Args:
+            driver_id: The driver ID to search for
+            internal: Number of internal search requests to look back (default: 2)
+        """
+        client = self.get_client()
+        if client is None:
+            logger.warning("ClickHouse client is not available, returning empty results")
+            return 0
+        
+        if not driver_id:
+            logger.error("driver_id is required for ClickHouse query")
+            return 0
+        
+        try:
+            row = client.execute(f"""
+                SELECT COUNT(*) from atlas_driver_offer_bpp.search_request_for_driver
+                WHERE driver_id = '{driver_id}'
+                AND created_at BETWEEN now() - INTERVAL {interval} HOUR AND now();
+            """)
+
+            logger.info(f"Search requests for driver: {len(row)}")
+            return row
+        except Exception as e:
+            logger.error(f"Error querying search requests for driver: {str(e)}")
+            return 0
 
 
+    def query_driver_locations(self, driver_id: str, interval: int = 2) -> int:
+        """
+        Query driver locations from ClickHouse for a specific driver.
+        
+        Args:
+            driver_id: The driver ID to search for
+            minutes_back: Number of minutes to look back (default: 1)
+        """
+        
+        client = self.get_client()
+        if client is None:
+            logger.warning("ClickHouse client is not available, returning empty results")
+            return 0
+        
+        if not driver_id:
+            logger.error("driver_id is required for ClickHouse query")
+            return 0
+        
+        try:
+            rows = client.execute(f"""
+                SELECT COUNT(*)
+                FROM atlas_kafka.driver_eda_kafka
+                WHERE driver_id = '{driver_id}'
+                AND partition_date = toDate(now()) AND ts BETWEEN now() - INTERVAL {interval} MINUTE AND now();
+            """)
+
+            return rows
+        except Exception as e:
+            logger.error(f"Error querying driver locations: {str(e)}")
+            return 0
+        
 # Global instance
 clickhouse_client = ClickHouseClient()
 

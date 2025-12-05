@@ -250,7 +250,6 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     async def on_end_call(handoverFrame):
         logger.info("End call")
         await session_manager.delete_session(session_id)
-        await task.queue_frames([CancelFrame()])
         await task.cancel()
 
 

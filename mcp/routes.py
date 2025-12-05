@@ -1,4 +1,5 @@
 """FastAPI route handlers."""
+import asyncio
 from fastapi import FastAPI, Request, HTTPException
 from typing import Dict, Any
 from loguru import logger
@@ -43,7 +44,11 @@ def register_routes(app: FastAPI) -> None:
                 }
             
             tool_func = TOOLS[tool_name]
-            result = tool_func(**parameters)
+            # Handle both sync and async tool functions
+            if asyncio.iscoroutinefunction(tool_func):
+                result = await tool_func(**parameters)
+            else:
+                result = tool_func(**parameters)
             
             return {"success": True, "result": result}
             

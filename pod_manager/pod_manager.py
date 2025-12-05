@@ -1,15 +1,12 @@
-import asyncio
-import uuid
 import json
 import time
-from typing import Dict, Optional
+from typing import Optional
 from fastapi import FastAPI, HTTPException
 from kubernetes import client, config
 from pydantic import BaseModel
 import redis
 import httpx
 import threading
-import os
 from loguru import logger
 
 import configs
@@ -25,21 +22,31 @@ MAX_POD = configs.MAX_POD
 REDIS_HOST = configs.REDIS_HOST
 REDIS_PORT = configs.REDIS_PORT
 
-
-redis_client = redis.Redis(
-    host=REDIS_HOST,
-    port=REDIS_PORT,
-    decode_responses=True,
-    socket_timeout=5,
-    socket_connect_timeout=5,
-    retry_on_timeout=True,
-    health_check_interval=30
-)
+if configs.ENVIRONMENT == "prod":
+    redis_client = redis.RedisCluster(
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        decode_responses=True,
+        socket_timeout=5,
+        socket_connect_timeout=5,
+        skip_full_coverage_check=True,  # Required for AWS ElastiCache
+        health_check_interval=30
+    )
+else:
+    redis_client = redis.Redis(
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        decode_responses=True,
+        socket_timeout=5,
+        socket_connect_timeout=5,
+        retry_on_timeout=True,
+        health_check_interval=30
+    )
 
 
 try:
     config.load_incluster_config()
-except:
+except Exception:
     config.load_kube_config()
 k8s = client.CoreV1Api()
 
@@ -91,7 +98,7 @@ def ensure_idle_pool():
 
         total_pods = active_count + idle_count
 
-        if total_pods +  >= MAX_POD:
+        if total_pods  >= MAX_POD:
             logger.info(f"Max pods reached: {total_pods} active pods")
             return
 
@@ -117,7 +124,7 @@ def delete_pod(name: str):
         )
         try:
             redis_client.lrem(REDIS_KEY_ACTIVE_PODS, 0, name)
-            async_thread(ensure_idle_pool())
+            async_thread(ensure_idle_pool)
         except Exception as e:
             logger.error(f"Redis error when deleting pod: {e}")
         logger.info(f"Pod deleted: {name}")
@@ -149,6 +156,9 @@ def create_pod():
         ),
         spec=client.V1PodSpec(
             restart_policy="Never",
+            **({"node_selector": {
+                "node-type": "generic-compute-spot"
+            }} if configs.ENVIRONMENT == "prod" else {}),
             containers=[
                 client.V1Container(
                     name="agent",
@@ -258,11 +268,11 @@ async def assign_call(req: DriverParams):
             )
             response.raise_for_status()
             redis_client.rpush(REDIS_KEY_ACTIVE_PODS, json.dumps({
-                "pod_name": req.pod_name,
-                "endpoint": req.endpoint
+                "pod_name": pod_name,
+                "endpoint": pod_endpoint
             }))
-        logger.info(f"Registered active pod → {req.pod_name}")
-            return response.json()
+            logger.info(f"Registered active pod → {pod_name}")
+            return response.json()  
     except Exception as e:
         logger.error(f"Pod {pod_name} failed to accept start-session: {e}")
         # pod becomes invalid, delete it

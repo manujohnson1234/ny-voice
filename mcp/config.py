@@ -28,6 +28,8 @@ class APIConfig:
 
     TIME_INTERVAL = os.getenv("TIME_INTERVAL", "40")
 
+    TIME_INTERVAL_FOR_LOCATIONS = os.getenv("TIME_INTERVAL_FOR_LOCATIONS", "10")
+
 class ClickHouseConfig:
     """ClickHouse database configuration."""
     

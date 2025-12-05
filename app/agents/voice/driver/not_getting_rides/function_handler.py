@@ -9,7 +9,7 @@ MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
 
 async def call_mcp_tool(tool_name: str, parameters: dict = None):
     """Call MCP server tool"""
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         try:
             payload = {
                 "tool": tool_name,
@@ -25,7 +25,7 @@ async def call_mcp_tool(tool_name: str, parameters: dict = None):
             return data
         except Exception as e:
             logger.error(f"Error calling MCP tool {tool_name}: {e}")
-            return {"success": False, "error": f"Failed to call {tool_name}: {str(e)}"}
+            return {"success": False, "error": f"Failed to call {tool_name}: {e}"}
 
 async def get_driver_info_handler(params: FunctionCallParams, session_id: str = None):
     """Handler for get_driver_info tool"""
