@@ -8,7 +8,7 @@ class LanguageCode(str, Enum):
     TAMIL = "ta" 
     KANNADA = "kn"
     MALAYALAM = "ml"
-
+    ENGLISH = "en"
 
 class DriverParams(BaseModel):
     phoneNumber: str

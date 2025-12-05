@@ -1,6 +1,7 @@
 import os
 from pipecat.services.sarvam.tts import SarvamTTSService
 from pipecat.services.google.tts import GoogleTTSService
+from pipecat.services.openai.tts import OpenAITTSService
 from pipecat.transcriptions.language import Language
 
 from app.core import config
@@ -19,8 +20,10 @@ def get_tts_service(language: str):
                 if language == "kn"
                 else Language.HI
                 if language == "hi"
-                else Language.ML,
-                pitch=0.1,
+                else Language.ML
+                if language == "ml"
+                else Language.EN,
+                pitch=0.2,
                 pace=1,
             )
         )
@@ -43,7 +46,7 @@ def get_tts_service(language: str):
     elif config.TTS_PROVIDER == "openai":
         return OpenAITTSService(
             api_key=config.OPENAI_API_KEY,
-            model="gpt-4o-tts",
+            voice="ballad",
             language = Language.TA_IN if language == "ta" else Language.KN_IN if language == "kn" else Language.HI_IN,
         )
     else:

@@ -95,32 +95,52 @@ class DriverService:
                 dues_details["driverId"] = driver_id
                 return dues_details
 
-        # Fetch search requests from API
-        search_response = self.search_request_client.get_search_requests(
-            driver_id,
-            minutes_back=int(APIConfig.TIME_INTERVAL),
-            limit=5
-        )
+        # Check if driver is online
+
+        # mode =  driver_info.get('driverMode')
+        # logger.info(f"Driver mode: {mode}")
+
+        if isinstance(driver_info, dict) :
+            mode = driver_info.get('driverMode')
+            logger.info(f"Driver mode: {mode}")
+            if mode == 'OFFLINE':
+                return {"success": True, "driver_mode": mode}
+
         
+
+
         search_requests_count = 0
-        if search_response.get("success"):
-            search_requests_count = search_response.get("count", 0)
+
+        if APIConfig.ENVIRONMENT == "master":
+        # Fetch search requests from API
+            search_response = self.search_request_client.get_search_requests(
+                driver_id,
+                minutes_back=40,
+                limit=20
+            )
+            if search_response.get("success"):
+                search_requests_count = search_response.get("count", 0)
         
         # Query ClickHouse for search requests
         clickhouse_results_count = 0
+        driver_locations_count = 0
         if APIConfig.ENVIRONMENT != "master":
-            clickhouse_results_count = clickhouse_client.query_search_requests(driver_id, minutes_back=int(APIConfig.TIME_INTERVAL))
+            clickhouse_results_count = clickhouse_client.query_search_requests_batch(driver_id, interval=int(APIConfig.TIME_INTERVAL))
+            search_requests_count = clickhouse_client.query_search_requests_for_driver(driver_id, interval=int(APIConfig.TIME_INTERVAL))
+            driver_locations_count = clickhouse_client.query_driver_locations(driver_id, interval=int(APIConfig.TIME_INTERVAL_FOR_LOCATIONS))
         
         
         
-        
+        # logger.info(f"Driver locations count: {driver_locations_count}")
         # Combine results
         if APIConfig.ENVIRONMENT != "master":
             combined_response = {
                 "success": True,
                 "no_search_requests": search_requests_count,
                 "driverId": driver_id,
-                "driver_considered_for_search_request_count": clickhouse_results_count
+                "driver_considered_for_nearby_search_request_count": clickhouse_results_count,
+                "driver_locations_count": driver_locations_count,
+                "hasDues": False,
             }
         else:
             combined_response = {

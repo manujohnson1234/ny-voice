@@ -22,7 +22,7 @@ def get_stt_service(language: str):
         return SarvamSTTService(
             api_key=config.SARVAM_API_KEY,
             model="saarika:v2.5",
-            language = Language.TA_IN if language == "ta" else Language.KN_IN if language == "kn" else Language.HI_IN if language == "hi" else Language.ML_IN,
+            language = Language.TA_IN if language == "ta" else Language.KN_IN if language == "kn" else Language.HI_IN if language == "hi" else Language.ML_IN if language == "ml" else Language.EN_IN,
         )
     else:
         raise ValueError(f"Invalid STT provider: {config.STT_PROVIDER}")
