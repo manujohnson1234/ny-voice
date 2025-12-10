@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 from services import driver_service, notification_service
 
 
-def get_driver_info(mobile_number: str) -> Dict[str, Any]:
+def get_driver_info(mobile_number: str, time_till_not_getting_rides: Optional[int] = None, time_quantity: Optional[str] = None) -> Dict[str, Any]:
     """
     Retrieve driver information and search requests using mobile number.
     
@@ -19,7 +19,7 @@ def get_driver_info(mobile_number: str) -> Dict[str, Any]:
     Returns:
         Dictionary containing driver information and status
     """
-    return driver_service.get_driver_info(mobile_number)
+    return driver_service.get_driver_info(mobile_number, time_till_not_getting_rides, time_quantity)
 
 
 def send_dummy_notification(

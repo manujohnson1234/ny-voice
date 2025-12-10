@@ -9,7 +9,7 @@ MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
 
 async def call_mcp_tool(tool_name: str, parameters: dict = None):
     """Call MCP server tool"""
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=25) as client:
         try:
             payload = {
                 "tool": tool_name,
@@ -40,6 +40,8 @@ async def get_driver_info_handler(params: FunctionCallParams, session_id: str = 
         }
         await params.result_callback(error_result)
         return
+
+    
     
     count_tool_calls = await session_manager.get_value(session_id, "count_tool_calls")
     count_tool_calls["get_driver_info"] = count_tool_calls.get("get_driver_info", 0) + 1
@@ -49,6 +51,8 @@ async def get_driver_info_handler(params: FunctionCallParams, session_id: str = 
         return
     
     driver_number = await session_manager.get_value(session_id, "driver_number")
+    time_till_not_getting_rides = None
+    time_quantity = None
     if not driver_number:
         logger.error(f"driver_number not found in session {session_id}")
         error_result = {
@@ -60,8 +64,13 @@ async def get_driver_info_handler(params: FunctionCallParams, session_id: str = 
     
     logger.info(f"Retrieved driver_number {driver_number} from session {session_id}")
     mobile_number = driver_number
-    
-    result = await call_mcp_tool("get_driver_info", {"mobile_number": mobile_number})
+
+    time_till_not_getting_rides = int(params.arguments.get("time_till_not_getting_rides"))
+    time_quantity = params.arguments.get("time_quantity")
+
+    logger.info(f"time_till_not_getting_rides: {time_till_not_getting_rides}, time_quantity: {time_quantity}")
+
+    result = await call_mcp_tool("get_driver_info", {"mobile_number": mobile_number, "time_till_not_getting_rides": time_till_not_getting_rides, "time_quantity": time_quantity})
 
     if isinstance(result, dict):
         if result.get("success") == False:

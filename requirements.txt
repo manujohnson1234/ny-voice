@@ -1,4 +1,4 @@
-pipecat-ai[webrtc,daily,silero,deepgram,openai,cartesia,local-smart-turn-v3,runner,google,koala,livekit,sarvam,aic]>= 0.0.95
+pipecat-ai[webrtc,daily,silero,deepgram,openai,cartesia,local-smart-turn-v3,runner,google,koala,livekit,sarvam,aic]>= 0.0.97
 aiofiles>=23.2.0
 python-dotenv>=1.0.0
 loguru>=0.7.2

@@ -3,6 +3,7 @@ import time
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from kubernetes import client, config
+from kubernetes.client.rest import ApiException
 from pydantic import BaseModel
 import redis
 import httpx
@@ -67,6 +68,7 @@ class RegisterReq(BaseModel):
 
 class EndReq(BaseModel):
     pod_name: str
+    endpoint: str
 
 
 
@@ -98,7 +100,7 @@ def ensure_idle_pool():
 
         total_pods = active_count + idle_count
 
-        if total_pods  >= MAX_POD:
+        if total_pods >= MAX_POD:
             logger.info(f"Max pods reached: {total_pods} active pods")
             return
 
@@ -115,7 +117,7 @@ def ensure_idle_pool():
     except Exception as e:
         logger.error(f"Error ensuring idle pool: {e}")
 
-def delete_pod(name: str):
+def delete_pod(name: str, active_entry: str):
     try:
         k8s.delete_namespaced_pod(
             name=name,
@@ -123,7 +125,7 @@ def delete_pod(name: str):
             body=client.V1DeleteOptions()
         )
         try:
-            redis_client.lrem(REDIS_KEY_ACTIVE_PODS, 0, name)
+            redis_client.lrem(REDIS_KEY_ACTIVE_PODS, 0, active_entry)
             async_thread(ensure_idle_pool)
         except Exception as e:
             logger.error(f"Redis error when deleting pod: {e}")
@@ -235,49 +237,65 @@ def create_pod():
 
 @app.post("/driver/voice/connect")
 async def assign_call(req: DriverParams):
-    try:
-        pod = redis_client.lpop(REDIS_KEY_WARM_PODS)
-    except (redis.ConnectionError, redis.TimeoutError) as e:
-        logger.error(f"Redis connection error when assigning call: {e}")
-        raise HTTPException(status_code=503, detail="Redis unavailable. Service temporarily unavailable.")
-    except Exception as e:
-        logger.error(f"Redis error when assigning call: {e}")
-        raise HTTPException(status_code=503, detail="Service temporarily unavailable.")
+    while True:
+        try:
+            pod = redis_client.lpop(REDIS_KEY_WARM_PODS)
+        except (redis.ConnectionError, redis.TimeoutError) as e:
+            logger.error(f"Redis connection error when assigning call: {e}")
+            raise HTTPException(status_code=503, detail="Redis unavailable. Service temporarily unavailable.")
+        except Exception as e:
+            logger.error(f"Redis error when assigning call: {e}")
+            raise HTTPException(status_code=503, detail="Service temporarily unavailable.")
 
-    if not pod:
-        # No idle pods → create one and queue this call
-        # async_thread(create_pod)
-        raise HTTPException(status_code=503, detail="No warm pods available. Try again immediately.")
+        if not pod:
+            async_thread(ensure_idle_pool)
+            raise HTTPException(status_code=503, detail="No warm pods available. Try again immediately.")
 
-    pod_info = json.loads(pod)
-    pod_endpoint = pod_info["endpoint"]
-    pod_name = pod_info["pod_name"]
+        pod_info = json.loads(pod)
+        pod_endpoint = pod_info["endpoint"]
+        pod_name = pod_info["pod_name"]
 
-    async_thread(ensure_idle_pool)
+        # Check if pod exists in Kubernetes before making HTTP request
+        try:
+            k8s.read_namespaced_pod(name=pod_name, namespace=NAMESPACE)
+        except ApiException as e:
+            if e.status == 404:
+                logger.warning(f"Pod {pod_name} not found in Kubernetes, removing from Redis and trying next")
+                continue
+            logger.error(f"Kubernetes API error checking pod {pod_name}: {e}")
+            continue
+        except Exception as e:
+            logger.error(f"Error checking pod {pod_name}: {e}")
+            continue
 
-    try:
-        async with httpx.AsyncClient(timeout=5) as client_http:
-            response = await client_http.post(
-                f"{pod_endpoint}/start-session",
-                json={
-                    "phoneNumber": req.phoneNumber,
-                    "language_code": req.language_code,
-                    "current_version_of_app": req.current_version_of_app,
-                    "latest_version_of_app": req.latest_version_of_app
-                }
-            )
-            response.raise_for_status()
-            redis_client.rpush(REDIS_KEY_ACTIVE_PODS, json.dumps({
+        async_thread(ensure_idle_pool)
+
+        try:
+            async with httpx.AsyncClient(timeout=5) as client_http:
+                response = await client_http.post(
+                    f"{pod_endpoint}/start-session",
+                    json={
+                        "phoneNumber": req.phoneNumber,
+                        "language_code": req.language_code,
+                        "current_version_of_app": req.current_version_of_app,
+                        "latest_version_of_app": req.latest_version_of_app
+                    }
+                )
+                response.raise_for_status()
+                redis_client.rpush(REDIS_KEY_ACTIVE_PODS, json.dumps({
+                    "pod_name": pod_name,
+                    "endpoint": pod_endpoint
+                }))
+                logger.info(f"Registered active pod → {pod_name}")
+                return response.json()  
+        except Exception as e:
+            logger.error(f"Pod {pod_name} failed to accept start-session: {e}")
+            active_entry = json.dumps({
                 "pod_name": pod_name,
                 "endpoint": pod_endpoint
-            }))
-            logger.info(f"Registered active pod → {pod_name}")
-            return response.json()  
-    except Exception as e:
-        logger.error(f"Pod {pod_name} failed to accept start-session: {e}")
-        # pod becomes invalid, delete it
-        async_thread(lambda: delete_pod(pod_name))
-        raise HTTPException(status_code=500, detail="Pod failed. Retrying recommended.")
+            })
+            async_thread(lambda: delete_pod(pod_name, active_entry))
+            raise HTTPException(status_code=500, detail="Pod failed. Retrying recommended.")
 
 
 
@@ -306,8 +324,11 @@ def register_pod(req: RegisterReq):
 def end_call(req: EndReq):
     """Pod notifies pod_manager it is done. Pod Manager deletes pod."""
     logger.info(f"Deleting pod after session → {req.pod_name}")
-
-    async_thread(lambda: delete_pod(req.pod_name))
+    active_entry = json.dumps({
+        "pod_name": req.pod_name,
+        "endpoint": req.endpoint
+    })
+    async_thread(lambda: delete_pod(req.pod_name, active_entry))
     return {"status": "deleted"}
 
 

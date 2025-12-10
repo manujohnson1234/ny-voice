@@ -22,7 +22,7 @@ class DriverService:
         self.search_request_client = SearchRequestClient()
         self.subscription_client = SubscriptionClient()
     
-    def get_driver_info(self, mobile_number: str) -> Dict[str, Any]:
+    def get_driver_info(self, mobile_number: str, time_till_not_getting_rides: Optional[int] = None, time_quantity: Optional[str] = None) -> Dict[str, Any]:
         """
         Get comprehensive driver information including status, dues, and search requests.
         
@@ -95,11 +95,7 @@ class DriverService:
                 dues_details["driverId"] = driver_id
                 return dues_details
 
-        # Check if driver is online
-
-        # mode =  driver_info.get('driverMode')
-        # logger.info(f"Driver mode: {mode}")
-
+        # offline check
         if isinstance(driver_info, dict) :
             mode = driver_info.get('driverMode')
             logger.info(f"Driver mode: {mode}")
@@ -124,10 +120,22 @@ class DriverService:
         # Query ClickHouse for search requests
         clickhouse_results_count = 0
         driver_locations_count = 0
+
+        if time_quantity:
+            if time_quantity in ["minutes", "Minutes", "MINUTES", "minute", "Minute", "MINUTE"]:
+                time_quantity = "MINUTE"
+            else:
+                time_quantity = "HOUR"
+
         if APIConfig.ENVIRONMENT != "master":
-            clickhouse_results_count = clickhouse_client.query_search_requests_batch(driver_id, interval=int(APIConfig.TIME_INTERVAL))
-            search_requests_count = clickhouse_client.query_search_requests_for_driver(driver_id, interval=int(APIConfig.TIME_INTERVAL))
-            driver_locations_count = clickhouse_client.query_driver_locations(driver_id, interval=int(APIConfig.TIME_INTERVAL_FOR_LOCATIONS))
+            if time_till_not_getting_rides and time_quantity:
+                clickhouse_results_count = clickhouse_client.query_search_requests_batch(driver_id, interval=time_till_not_getting_rides, time_quantity=time_quantity)
+                search_requests_count = clickhouse_client.query_search_requests_for_driver(driver_id, interval=time_till_not_getting_rides, time_quantity=time_quantity)
+            else:
+                clickhouse_results_count = clickhouse_client.query_search_requests_batch(driver_id, interval=int(APIConfig.TIME_INTERVAL), time_quantity="HOUR")
+                search_requests_count = clickhouse_client.query_search_requests_for_driver(driver_id, interval=int(APIConfig.TIME_INTERVAL), time_quantity="HOUR")
+
+        driver_locations_count = clickhouse_client.query_driver_locations(driver_id, interval=int(APIConfig.TIME_INTERVAL_FOR_LOCATIONS))
         
         
         

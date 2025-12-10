@@ -12,7 +12,7 @@ class DriverInfoClient:
     """Client for driver information API."""
     
     @staticmethod
-    def get_driver_info(mobile_number: str) -> Dict[str, Any]:
+    def get_driver_info(mobile_number: str, time_till_not_getting_rides: Optional[int] = None, time_quantity: Optional[str] = None) -> Dict[str, Any]:
         """
         Fetch driver information by mobile number.
         

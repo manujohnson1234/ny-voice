@@ -3,8 +3,18 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 driver_info = FunctionSchema(
     name="get_driver_info",
     description="Retrieve driver information of Namma Yatri",
-    properties={},
-    required=[]
+    properties={
+        "time_till_not_getting_rides": {
+            "type": "integer",
+            "description": "Time till not getting rides in minutes"
+        },
+        "time_quantity": {
+            "type": "string",
+            "description": "Time quantity in minutes or hours",
+            "enum": ["MINUTE", "HOUR"]
+        },
+    },
+    required=[],
 )
 
 send_dummy_request = FunctionSchema(
