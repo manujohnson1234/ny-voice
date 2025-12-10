@@ -29,7 +29,9 @@ class ClickHouseClient:
                 host=ClickHouseConfig.HOST,
                 user=ClickHouseConfig.USER,
                 password=ClickHouseConfig.PASSWORD,
-                port=ClickHouseConfig.PORT
+                port=ClickHouseConfig.PORT,
+                send_receive_timeout=10,  # 5 second timeout for all queries
+                settings={'max_execution_time': 10}  # Server-side query timeout
             )
             logger.info("ClickHouse client initialized successfully")
             return self._client
@@ -41,7 +43,8 @@ class ClickHouseClient:
     def query_search_requests_batch(
         self, 
         driver_id: str, 
-        interval: int = 2
+        interval: int = 2,
+        time_quantity: str = "HOUR"
     ) -> int:
         """
         Query search requests from ClickHouse for a specific driver.
@@ -71,7 +74,7 @@ class ClickHouseClient:
                 SELECT COUNT(*)
                 FROM atlas_kafka.search_request_batch
                 WHERE has(driverIds, '{escaped_driver_id}')
-                  AND date BETWEEN now() - INTERVAL {interval} HOUR AND now()
+                  AND date BETWEEN now() - INTERVAL {interval} {time_quantity} AND now()
                   AND filterStage = 'ActualDistance';
             """)
             
@@ -83,7 +86,7 @@ class ClickHouseClient:
             logger.error(f"ClickHouse query failed: {str(e)}")
             return 0
 
-    def query_search_requests_for_driver(self, driver_id: str, interval: int = 2) -> int: 
+    def query_search_requests_for_driver(self, driver_id: str, interval: int = 2, time_quantity: str = "HOUR") -> int: 
         """
         Query search requests from ClickHouse for a specific driver.
         
@@ -99,12 +102,12 @@ class ClickHouseClient:
         if not driver_id:
             logger.error("driver_id is required for ClickHouse query")
             return 0
-        
+        logger.info(f"interval: {interval}, time_quantity: {time_quantity}")
         try:
             row = client.execute(f"""
                 SELECT COUNT(*) from atlas_driver_offer_bpp.search_request_for_driver
                 WHERE driver_id = '{driver_id}'
-                AND created_at BETWEEN now() - INTERVAL {interval} HOUR AND now();
+                AND created_at BETWEEN now() - INTERVAL {interval} {time_quantity} AND now();
             """)
 
             logger.info(f"Search requests for driver: {len(row)}")

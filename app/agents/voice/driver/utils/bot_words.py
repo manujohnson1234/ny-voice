@@ -3,7 +3,7 @@ BOT_WORDS = {
     "ta": {
         "error_due_to_mcp_or_common": "sorry, எங்கள் பக்கத்தில் சிறிது சிக்கல் ஏற்பட்டுள்ளது. தயவுசெய்து  screen-la இருக்கும் number-க்கு call பண்ணுங்க.",
         "driver_asked_to_call_agent": "இந்த issue தீர்க்க, தயவுசெய்து மொபைல்ல காமிக்குற நம்பருக்கு call பண்ணுங்க.",
-        "time_out_error": "நா மூனு நிமிஷத்துக்கு மேல help பண்ண முடியாது, சோரி. இன்னும் help வேணும்னா, screen-la இருக்கும் number-க்கு call பண்ணுங்க.",
+        "time_out_error": "நா மூனு நிமிஷத்துக்கு மேல help பண்ண முடியாது, sorry. இன்னும் help வேணும்னா, screen-la இருக்கும் number-க்கு call பண்ணுங்க.",
     },
     "kn": {
         "error_due_to_mcp_or_common": "sorry, ನಮ್ಮ side ಸ್ವಲ್ಪ issue ಆಗಿದೆ. ದಯವಿಟ್ಟು screen ಮೇಲೆ ಇರುವ numberಗೆ call ಮಾಡಿ.",

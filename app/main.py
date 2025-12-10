@@ -29,6 +29,7 @@ from app.core.config import (
     DAILY_API_KEY,
     DAILY_API_URL,
     MAX_SESSION_TIME,
+    NOTIFY_ENDPOINT,
     ROUTER_URL,
     POD_NAME,
     POD_IP,
@@ -41,6 +42,15 @@ from loguru import logger
 
 
 bot_procs = {}
+
+
+def _pod_endpoint() -> str | None:
+    """Return the stable endpoint that other services should call."""
+    if NOTIFY_ENDPOINT:
+        return NOTIFY_ENDPOINT
+    if POD_IP:
+        return f"http://{POD_IP}:{PORT}"
+    return None
 
 
 daily_rest = DailyRESTHelper(daily_api_key=DAILY_API_KEY, daily_api_url=DAILY_API_URL,aiohttp_session=aiohttp.ClientSession())
@@ -142,14 +152,14 @@ async def driver_voice_connect(request: DriverParams):
     return {"room_url": room.url, "token": token}
 
 async def register_with_router():
-    if not POD_IP or not POD_NAME:
-        logger.warning(f"[POD] Cannot register: POD_IP={POD_IP}, POD_NAME={POD_NAME}")
+    endpoint = _pod_endpoint()
+    if not endpoint or not POD_NAME:
+        logger.warning(f"[POD] Cannot register: endpoint={endpoint}, POD_NAME={POD_NAME}")
         return
     
     try:
         async with aiohttp.ClientSession() as session:
             url = f"{ROUTER_URL}/register"
-            endpoint = f"http://{POD_IP}:{PORT}"
             logger.info(f"[POD] Registering with endpoint {endpoint}")
             async with session.post(url, json={
                 "pod_name": POD_NAME,
@@ -165,8 +175,9 @@ async def register_with_router():
 
 async def notify_session_ended():
     """Notify the router that a session has ended."""
-    if not POD_NAME or not ROUTER_URL:
-        logger.warning(f"[POD] Cannot notify session ended: POD_NAME={POD_NAME}, ROUTER_URL={ROUTER_URL}")
+    endpoint = _pod_endpoint()
+    if not endpoint or not POD_NAME or not ROUTER_URL:
+        logger.warning(f"[POD] Cannot notify session ended: endpoint={endpoint}, POD_NAME={POD_NAME}, ROUTER_URL={ROUTER_URL}")
         return
     
     try:
@@ -174,7 +185,8 @@ async def notify_session_ended():
             url = f"{ROUTER_URL}/session-ended"
             logger.info(f"[POD] Notifying session ended for pod: {POD_NAME}")
             async with session.post(url, json={
-                "pod_name": POD_NAME
+                "pod_name": POD_NAME,
+                "endpoint": endpoint
             }) as response:
                 if response.status == 200:
                     logger.info(f"[POD] Successfully notified session ended")
