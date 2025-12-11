@@ -2,7 +2,7 @@ import json
 import time
 from typing import Optional
 from fastapi import FastAPI, HTTPException
-from kubernetes import client, config
+from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
 from pydantic import BaseModel
 import redis
@@ -64,7 +64,7 @@ class DriverParams(BaseModel):
 
 class RegisterReq(BaseModel):
     pod_name: str
-    endpoint: str   # pod internal URL (http://ip:8080)
+    endpoint: str
 
 class EndReq(BaseModel):
     pod_name: str
@@ -126,7 +126,7 @@ def delete_pod(name: str, active_entry: str):
         )
         try:
             redis_client.lrem(REDIS_KEY_ACTIVE_PODS, 0, active_entry)
-            async_thread(ensure_idle_pool)
+            logger.info(f"Removed from active pods: {name}")
         except Exception as e:
             logger.error(f"Redis error when deleting pod: {e}")
         logger.info(f"Pod deleted: {name}")
@@ -232,7 +232,56 @@ def create_pod():
 
     return name
 
+def watch_pipecat_pods():
+    w = watch.Watch()
+    logger.info("Starting watcher for pipecat-agent-* pods...")
 
+    while True:
+        try:
+            for event in w.stream(k8s.list_namespaced_pod,namespace=NAMESPACE,timeout_seconds=60):
+                typ = event["type"]          # ADDED / MODIFIED / DELETED
+                pod = event["object"]
+                name = pod.metadata.name
+
+                if not name.startswith("pipecat-agent-"):
+                    continue
+
+                pod_ip = pod.status.pod_ip
+
+                if typ == "DELETED":
+                    logger.warning(f"[WATCH] Pod deleted → {name}")
+                    to_be_deleted = json.dumps({
+                        "pod_name": name,
+                        "endpoint": f"http://{pod_ip}:8080"
+                    })
+                    try:
+                        redis_client.lrem(REDIS_KEY_WARM_PODS, 0, to_be_deleted)
+                        async_thread(ensure_idle_pool)
+                        logger.info(f"[WATCH] Pod deleted → {name}")
+                    except Exception as e:
+                        logger.error(f"Redis error when deleting pod: {e}")
+                        continue
+                    
+        except Exception as e:
+            logger.error(f"Error watching pods: {e}")
+            time.sleep(1)
+            continue
+            
+
+def maintain_warm_pods():
+    while True:
+        try:
+            idle_count = redis_client.llen(REDIS_KEY_WARM_PODS)
+            if idle_count > MIN_IDLE:
+                excess = idle_count - MIN_IDLE
+                for _ in range(excess):
+                    pod = redis_client.rpop(REDIS_KEY_WARM_PODS)
+                    if pod:
+                        pod_info = json.loads(pod)
+                        delete_pod(pod_info["pod_name"], pod)
+        except Exception as e:
+            logger.error(f"Error maintaining warm pods: {e}")
+        time.sleep(300)  
 
 
 @app.post("/driver/voice/connect")
@@ -341,6 +390,7 @@ async def health_check():
 @app.on_event("startup")
 def startup_event():
     logger.info("Starting up... ensuring warm pool")
-    # Run in background thread to avoid blocking startup if Redis is slow/unavailable
     async_thread(ensure_idle_pool)
+    async_thread(watch_pipecat_pods)
+    async_thread(maintain_warm_pods)
 

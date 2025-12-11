@@ -2,7 +2,7 @@
 GREETINGS = {
     "ta": "வணக்கம்! நம்ம யாத்திரி டிரைவர் சப்போர்ட்-க்கு உங்களை வரவேற்கிறோம். ride கிடைக்கலன்னு ஏதாவது issue இருக்கா? நான் உங்களுக்கு எப்படி உதவ முடியும்?",
     "kn": "ನಮಸ್ಕಾರ! ನಮ್ಮ ಯಾತ್ರಿ ಡ್ರೈವರ್ ಸಪೋರ್ಟ್‌ಗೆ ನಿಮಗೆ ಸ್ವಾಗತ. ride ಸಿಗ್ತಿಲ್ಲ ಅಂತ ಯಾವದಾದ್ರು issue ಇದೆಯಾ? ನಾನು ನಿಮಗೆ ಹೇಗೆ help ಮಾಡಬಹುದು?",
-    "hi": "नमस्ते! नम्मा यात्री ड्राइवर सपोर्ट में आपका स्वागत है। ride नहीं मिल रही है, कोई issue है क्या? मैं आपकी कैसे help कर सकता हूँ?",
+    "hi": "नमस्ते! नम्मा यात्री ड्राइवर सपोर्ट में आपका स्वागत है। Ride मिलने का issue है क्या? मैं आपकी कैसे help कर सकती हूँ?",
     "ml": "നമസ്കാരം! നമ്മ യാത്രി ഡ്രൈവർ സപ്പോർട്ടിലേക്ക് നിങ്ങളെ സ്വാഗതം ചെയ്യുന്നു. ഇന്ന് നിങ്ങൾക്ക് എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?",
 }
 
@@ -10,7 +10,7 @@ GREETINGS = {
 IRRELEVANT_QUESTION_RESPONSES = {
     "ta": "sorry, இந்த கேள்விக்கு நான் உதவி செய்ய முடியாது. நான் நம்ம யாத்திரி ஆப் பிரச்சினைகளில் மட்டுமே உதவுவேன்.",
     "kn": "sorry, ಈ ಪ್ರಶ್ನೆಗೆ ನಾನು ಸಹಾಯ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ನಾನು ನಮ್ಮ ಯಾತ್ರಿ ಆಪ್ ಸಮಸ್ಯೆಗಳಲ್ಲಿ ಮಾತ್ರ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.",
-    "hi": "sorry, मैं इस प्रश्न में मदद नहीं कर सकता। मैं केवल नम्मा यात्री ऐप समस्याओं में मदद करता हूं।",
+    "hi": "sorry, मैं इस प्रश्न में मदद नहीं कर सकती। मैं केवल नम्मा यात्री ऐप समस्याओं में मदद करती हूं।",
     "ml": "ക്ഷമിക്കണം, ഈ ചോദ്യത്തിന് എനിക്ക് സഹായിക്കാൻ കഴിയില്ല. ഞാൻ നമ്മ യാത്രി ആപ്പ് പ്രശ്നങ്ങളിൽ മാത്രമേ സഹായിക്കൂ.",
 }
 
@@ -95,7 +95,6 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
         
             STEP 1: GET COMPREHENSIVE DRIVER INFORMATION
             Apoligies to the driver for the inconvenience
-            Before calling get_driver_info, ask the driver to hold on for 1 minute while you check their information.
             Then use get_driver_info tool to fetch their details. OPTIONAL PARAMETERS: time_till_not_getting_rides and time_quantity. For example user says i am not getting rides for 10 minutes, then you should use the tool with parameters time_till_not_getting_rides=10 and time_quantity="MINUTE". default will be time_till_not_getting_rides="2" and time_quantity="HOUR".This tool provides:
             * Blocked u will get the blocked status if Blocked status is true.
             * blockedReason u will get the reason for blocking the driver.
