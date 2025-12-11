@@ -13,7 +13,7 @@ BOT_WORDS = {
     "hi": {
         "error_due_to_mcp_or_common": "sorry, हमारी side थोड़ा issue हो गया है. कृपया screen पर दिख रहे number पर call करें.",
         "driver_asked_to_call_agent": "इस issue को solve करने के लिए, कृपया mobile पर दिख रहे number पर call करें.",
-        "time_out_error": "मैं तीन मिनट से ज़्यादा help नहीं कर सकता, sorry. अगर और help चाहिए तो screen पर दिख रहे number पर call करें.",
+        "time_out_error": "मैं तीन मिनट से ज़्यादा help नहीं कर सकती, sorry. अगर और help चाहिए तो screen पर दिख रहे number पर call करें.",
     },
     "ml": {
         "error_due_to_mcp_or_common": "ക്ഷമിക്കണം, ഞങ്ങളുടെ വശത്ത് നിന്ന് കുറച്ച് പ്രശ്നം ഉണ്ടായി. ദയവായി സ്‌ക്രീനിൽ കാണിച്ചിരിക്കുന്ന നമ്പറിൽ ബന്ധപ്പെടുക.",

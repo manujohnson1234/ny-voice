@@ -23,8 +23,8 @@ def get_tts_service(language: str):
                 else Language.ML
                 if language == "ml"
                 else Language.EN,
-                pitch=0.2,
-                pace=1,
+                pitch=config.SARVAM_PITCH,
+                pace=config.SARVAM_PACE,
             )
         )
     elif config.TTS_PROVIDER == "google":

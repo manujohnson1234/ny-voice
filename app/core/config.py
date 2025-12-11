@@ -55,3 +55,6 @@ ROUTER_URL = os.environ.get("ROUTER_URL", "http://router:8082")
 POD_NAME = os.environ.get("POD_NAME")
 POD_IP = os.environ.get("POD_IP")
 NOTIFY_ENDPOINT = os.environ.get("NOTIFY_ENDPOINT")
+
+SARVAM_PITCH = os.environ.get("SARVAM_PITCH", "0.1")
+SARVAM_PACE = os.environ.get("SARVAM_PACE", "0.9")
