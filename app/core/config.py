@@ -1,5 +1,5 @@
 import os
-
+import base64
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -48,7 +48,7 @@ ENABLE_S3_STORAGE = os.environ.get("ENABLE_S3_STORAGE", "false").lower() == "tru
 ENABLE_LOCAL_STORAGE = os.environ.get("ENABLE_LOCAL_STORAGE", "false").lower() == "true"
 
 
-MAX_SESSION_TIME = 5 * 60  # seconds or whatever you want
+MAX_SESSION_TIME = 5 * 60 
 
 
 ROUTER_URL = os.environ.get("ROUTER_URL", "http://router:8082")
@@ -58,3 +58,15 @@ NOTIFY_ENDPOINT = os.environ.get("NOTIFY_ENDPOINT")
 
 SARVAM_PITCH = os.environ.get("SARVAM_PITCH", "0.1")
 SARVAM_PACE = os.environ.get("SARVAM_PACE", "0.9")
+
+ENABLE_TRACING = os.environ.get("ENABLE_TRACING", "false").lower() == "true"
+
+LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY")
+LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
+
+LANGFUSE_BASE_URL = os.getenv("LANGFUSE_BASE_URL", "http://localhost:3000")
+
+LANGFUSE_AUTH = base64.b64encode(f"{LANGFUSE_PUBLIC_KEY}:{LANGFUSE_SECRET_KEY}".encode()).decode()
+
+os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = f"{LANGFUSE_BASE_URL}/api/public/otel"
+os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {LANGFUSE_AUTH}"

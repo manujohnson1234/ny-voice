@@ -72,3 +72,5 @@ POD_MEM_PROD=os.environ.get("POD_MEM_PRODUCER", "512Mi")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
 REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
+
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
