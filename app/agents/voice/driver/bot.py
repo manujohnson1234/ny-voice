@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 import aiofiles
 import boto3
+from zoneinfo import ZoneInfo
 
 
 project_root = Path(__file__).parent.parent.parent.parent.parent
@@ -17,7 +18,7 @@ from dotenv import load_dotenv
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask,PipelineParams
-from pipecat.transports.services.daily import DailyParams, DailyTransport
+from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
 
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
@@ -43,6 +44,10 @@ from pipecat.frames.frames import TTSSpeakFrame
 
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 
+from pipecat.utils.tracing.conversation_context_provider import (
+    ConversationContextProvider,
+)
+
 from loguru import logger
 
 from app.agents.voice.driver.tts import get_tts_service
@@ -61,6 +66,9 @@ from app.core.session_manager import get_session_manager
 from app.core.session_manager import SessionManager
 
 
+from app.agents.voice.driver.analytics.tracing_setup import setup_tracing
+from langfuse import get_client
+from opentelemetry import trace
 
 load_dotenv(override=True)
 
@@ -191,7 +199,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     elif (config.ENABLE_AIC_FILTER):
         daily_params.audio_in_filter  = AICFilter(license_key=config.AIC_ACCESS_KEY,enhancement_level=1.0)
 
-
+    setup_tracing(service_name="ny-driver-bot")
 
 
     transport = DailyTransport(
@@ -223,15 +231,23 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
             context_aggregator.assistant(),  # Assistant spoken responses
         ]
     )
+    ist_time = datetime.now(ZoneInfo("Asia/Kolkata"))
+    timestamp = ist_time.strftime("%Y-%m-%d_%H-%M-%S")
+    conversation_id = f"{driver_number}-{session_id}-{timestamp}"
 
-    task = PipelineTask(
-        pipeline,
-        params=PipelineParams(
-            enable_metrics=True,
-            enable_usage_metrics=True,
-        ),
-        observers=[RTVIObserver(rtvi)],
-    )
+
+    task_params ={
+        "params": PipelineParams(allow_interruptions=True),
+        "cancel_on_idle_timeout": True,
+        "observers": [RTVIObserver(rtvi)],
+    }
+
+    if config.ENABLE_TRACING:
+        task_params["conversation_id"] = conversation_id
+        task_params["enable_tracing"] = True
+
+    task = PipelineTask(pipeline, **task_params)
+
 
     # Timer task variable to store the background timer
     timer_task = None
@@ -245,7 +261,11 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 
         # Additional actions can be added here
     
-    
+
+    @task.event_handler("on_pipeline_error")
+    async def on_pipeline_error(task, frame):
+        print("Pipeline error:", frame.error)
+        
     @handoverFrame.event_handler("on_end_call")
     async def on_end_call(handoverFrame):
         logger.info("End call")
@@ -327,12 +347,54 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         
         await task.cancel()
 
-    runner = PipelineRunner()
-    await runner.run(task)
 
     @transport.event_handler("on_joined")
     async def on_joined(transport):
         await task.queue_frame(FilterEnableFrame(True))
+
+
+    runner = PipelineRunner()
+
+    async def run_pipeline():
+        try:
+            await runner.run(task)
+        except asyncio.CancelledError:
+            logger.info("Main task cancelled. Exiting gracefully.")
+        except Exception as e:
+            logger.error(f"Pipeline runner error: {e}")
+
+    
+
+    if config.ENABLE_TRACING:
+        langfuse_client = get_client()
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span(conversation_id) as root_span:
+            logger.info(
+                f"Starting current span with conversation ID: {conversation_id}"
+            )
+            root_span.set_attribute("driver_number", driver_number)
+            root_span.set_attribute("language_code", language_code)
+            root_span.set_attribute("current_version_of_app", current_version_of_app)
+            root_span.set_attribute("latest_version_of_app", latest_version_of_app)
+            root_span.set_attribute("session_id", session_id)
+            
+
+
+            langfuse_client.update_current_trace(
+                user_id=driver_number,
+                session_id=session_id
+            )
+
+            provider = ConversationContextProvider.get_instance()
+            provider.set_current_conversation_context(
+                root_span.get_span_context(), conversation_id
+            )
+            logger.info(
+                f"Set Pipecat conversation context with span ID: {root_span.get_span_context().span_id}"
+            )
+            await run_pipeline()
+    else:
+        await run_pipeline()
 
 def parse_args():
     parser = argparse.ArgumentParser()

@@ -11,6 +11,7 @@ import threading
 from loguru import logger
 
 import configs
+from kafka_logger import KafkaLogProducer
 
 REDIS_KEY_WARM_PODS = configs.REDIS_KEY_WARM_PODS
 REDIS_KEY_ACTIVE_PODS = configs.REDIS_KEY_ACTIVE_PODS
@@ -22,6 +23,10 @@ POD_MEM = configs.POD_MEM_MASTER if configs.ENVIRONMENT == "master" else configs
 MAX_POD = configs.MAX_POD
 REDIS_HOST = configs.REDIS_HOST
 REDIS_PORT = configs.REDIS_PORT
+
+# Initialize Kafka log producer and add as loguru sink
+kafka_producer = KafkaLogProducer(bootstrap_servers=configs.KAFKA_BOOTSTRAP_SERVERS)
+logger.add(kafka_producer.sink, level="INFO")
 
 if configs.ENVIRONMENT == "prod":
     redis_client = redis.RedisCluster(
@@ -81,7 +86,6 @@ def async_thread(fn):
 
 
 
-
 def ensure_idle_pool():
     """Ensures always 3 warm pods."""
     try:
@@ -107,11 +111,11 @@ def ensure_idle_pool():
         to_create = MIN_IDLE - idle_count
 
         if to_create > 0:
-            logger.info(f"Ensuring warm pool: {idle_count} idle, creating {to_create} pods")
+            logger.debug(f"Ensuring warm pool: {idle_count} idle, creating {to_create} pods")
             for _ in range(to_create):
                 async_thread(create_pod)
         else:
-            logger.info(f"Warm pool sufficient: {idle_count} idle pods")
+            logger.debug(f"Warm pool sufficient: {idle_count} idle pods")
     except (redis.ConnectionError, redis.TimeoutError) as e:
         logger.warning(f"Redis connection issue during pool check: {e}")
     except Exception as e:
@@ -126,12 +130,12 @@ def delete_pod(name: str, active_entry: str):
         )
         try:
             redis_client.lrem(REDIS_KEY_ACTIVE_PODS, 0, active_entry)
-            logger.info(f"Removed from active pods: {name}")
+            logger.bind(sessionId=name).info(f"Removed from active pods: {name}")
         except Exception as e:
-            logger.error(f"Redis error when deleting pod: {e}")
-        logger.info(f"Pod deleted: {name}")
+            logger.bind(sessionId=name).error(f"Redis error when deleting pod: {e}")
+        logger.bind(sessionId=name).info(f"Pod deleted: {name}")
     except Exception as e:
-        logger.error(f"Pod delete error: {e}")
+        logger.bind(sessionId=name).error(f"Pod delete error: {e}")
 
 
 
@@ -226,9 +230,9 @@ def create_pod():
 
     try:
         k8s.create_namespaced_pod(namespace=NAMESPACE, body=pod)
-        logger.info(f"Created pod: {name}")
+        logger.bind(sessionId=name).info(f"Created pod: {name}")
     except Exception as e:
-        logger.error(f"Pod creation error: {e}")
+        logger.bind(sessionId=name).error(f"Pod creation error: {e}")
 
     return name
 
@@ -249,7 +253,7 @@ def watch_pipecat_pods():
                 pod_ip = pod.status.pod_ip
 
                 if typ == "DELETED":
-                    logger.warning(f"[WATCH] Pod deleted → {name}")
+                    logger.bind(sessionId=name).warning(f"[WATCH] Pod deleted → {name}")
                     to_be_deleted = json.dumps({
                         "pod_name": name,
                         "endpoint": f"http://{pod_ip}:8080"
@@ -257,9 +261,9 @@ def watch_pipecat_pods():
                     try:
                         redis_client.lrem(REDIS_KEY_WARM_PODS, 0, to_be_deleted)
                         async_thread(ensure_idle_pool)
-                        logger.info(f"[WATCH] Pod deleted → {name}")
+                        logger.bind(sessionId=name).info(f"[WATCH] Pod deleted → {name}")
                     except Exception as e:
-                        logger.error(f"Redis error when deleting pod: {e}")
+                        logger.bind(sessionId=name).error(f"Redis error when deleting pod: {e}")
                         continue
                     
         except Exception as e:
@@ -309,12 +313,12 @@ async def assign_call(req: DriverParams):
             k8s.read_namespaced_pod(name=pod_name, namespace=NAMESPACE)
         except ApiException as e:
             if e.status == 404:
-                logger.warning(f"Pod {pod_name} not found in Kubernetes, removing from Redis and trying next")
+                logger.bind(sessionId=pod_name, userId=req.phoneNumber).warning(f"Pod {pod_name} not found in Kubernetes, removing from Redis and trying next")
                 continue
-            logger.error(f"Kubernetes API error checking pod {pod_name}: {e}")
+            logger.bind(sessionId=pod_name, userId=req.phoneNumber).error(f"Kubernetes API error checking pod {pod_name}: {e}")
             continue
         except Exception as e:
-            logger.error(f"Error checking pod {pod_name}: {e}")
+            logger.bind(sessionId=pod_name, userId=req.phoneNumber).error(f"Error checking pod {pod_name}: {e}")
             continue
 
         async_thread(ensure_idle_pool)
@@ -335,10 +339,10 @@ async def assign_call(req: DriverParams):
                     "pod_name": pod_name,
                     "endpoint": pod_endpoint
                 }))
-                logger.info(f"Registered active pod → {pod_name}")
+                logger.bind(sessionId=pod_name, userId=req.phoneNumber).info(f"Registered active pod → {pod_name}")
                 return response.json()  
         except Exception as e:
-            logger.error(f"Pod {pod_name} failed to accept start-session: {e}")
+            logger.bind(sessionId=pod_name, userId=req.phoneNumber).error(f"Pod {pod_name} failed to accept start-session: {e}")
             active_entry = json.dumps({
                 "pod_name": pod_name,
                 "endpoint": pod_endpoint
@@ -356,13 +360,12 @@ def register_pod(req: RegisterReq):
             "pod_name": req.pod_name,
             "endpoint": req.endpoint
         }))
-        logger.info(f"Registered warm pod → {req.pod_name}")
+        logger.bind(sessionId=req.pod_name).info(f"Registered warm pod → {req.pod_name}")
     except (redis.ConnectionError, redis.TimeoutError) as e:
-        logger.error(f"Redis connection error when registering pod: {e}")
-        # Still return success to avoid pod retrying registration
+        logger.bind(sessionId=req.pod_name).error(f"Redis connection error when registering pod: {e}")
         return {"status": "registered", "warning": "Redis unavailable, registration may not persist"}
     except Exception as e:
-        logger.error(f"Redis error when registering pod: {e}")
+        logger.bind(sessionId=req.pod_name).error(f"Redis error when registering pod: {e}")
         return {"status": "registered", "warning": "Redis error, registration may not persist"}
 
     return {"status": "registered"}
@@ -372,7 +375,7 @@ def register_pod(req: RegisterReq):
 @app.post("/session-ended")
 def end_call(req: EndReq):
     """Pod notifies pod_manager it is done. Pod Manager deletes pod."""
-    logger.info(f"Deleting pod after session → {req.pod_name}")
+    logger.bind(sessionId=req.pod_name).info(f"Deleting pod after session → {req.pod_name}")
     active_entry = json.dumps({
         "pod_name": req.pod_name,
         "endpoint": req.endpoint
@@ -389,7 +392,7 @@ async def health_check():
 
 @app.on_event("startup")
 def startup_event():
-    logger.info("Starting up... ensuring warm pool")
+    logger.debug("Starting up... ensuring warm pool")
     async_thread(ensure_idle_pool)
     async_thread(watch_pipecat_pods)
     async_thread(maintain_warm_pods)

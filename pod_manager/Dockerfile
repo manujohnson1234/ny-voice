@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # Copy the application code
 COPY pod_manager.py .
 COPY configs.py .
+COPY kafka_logger.py .
 COPY run.py .
 
 # Create a non-root user to run the application
