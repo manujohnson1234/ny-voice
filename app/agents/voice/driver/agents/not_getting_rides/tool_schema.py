@@ -1,4 +1,5 @@
 from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 
 driver_info = FunctionSchema(
     name="get_driver_info",
@@ -37,3 +38,6 @@ bot_fail_to_resolve = FunctionSchema(
     properties={},
     required=[]
 )
+
+def get_not_getting_rides_tool_schema():
+    return ToolsSchema(standard_tools=[driver_info, send_dummy_request, send_overlay_sms, bot_fail_to_resolve])

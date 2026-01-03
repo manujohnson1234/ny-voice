@@ -200,6 +200,10 @@ def create_pod():
                         client.V1EnvVar(name="ENABLE_LOCAL_STORAGE", value=str(configs.ENABLE_LOCAL_STORAGE).lower()),
                         client.V1EnvVar(name="ROUTER_URL", value=configs.ROUTER_URL),
                         client.V1EnvVar(name="MCP_SERVER_URL", value=configs.MCP_SERVER_URL),
+                        client.V1EnvVar(name="ENABLE_TRACING", value=str(configs.ENABLE_TRACING).lower()),
+                        client.V1EnvVar(name="LANGFUSE_BASE_URL", value=configs.LANGFUSE_BASE_URL),
+                        client.V1EnvVar(name="LANGFUSE_SECRET_KEY", value=configs.LANGFUSE_SECRET_KEY),
+                        client.V1EnvVar(name="LANGFUSE_PUBLIC_KEY", value=configs.LANGFUSE_PUBLIC_KEY),
                         client.V1EnvVar(
                             name="POD_NAME",
                             value_from=client.V1EnvVarSource(

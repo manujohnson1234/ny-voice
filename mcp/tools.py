@@ -1,7 +1,7 @@
 """MCP tool functions that expose services via the MCP interface."""
 from typing import Dict, Any, Optional
 
-from services import driver_service, notification_service
+from services import driver_service, notification_service, ride_details_service, doc_status_service
 
 
 def get_driver_info(mobile_number: str, time_till_not_getting_rides: Optional[int] = None, time_quantity: Optional[str] = None) -> Dict[str, Any]:
@@ -52,11 +52,34 @@ def send_overlay_sms(driver_id: str) -> Dict[str, Any]:
     return notification_service.send_overlay_sms(driver_id)
 
 
+def get_ride_details(ride_id: str, issue_type: str) -> Dict[str, Any]:
+    """
+    Get ride details by ride ID.
+    
+    Args:
+        ride_id: Ride ID
+        issue_type: Issue type
+    """
+    return ride_details_service.get_ride_details(ride_id, issue_type)
+
+
+
+def get_doc_status(mobile_number: str) -> Dict[str, Any]:
+    """
+    Get the status of the driver's documents (RC/DL).
+    
+    Args:
+        mobile_number: Driver's mobile number
+    """
+    return doc_status_service.get_doc_status(mobile_number)
+
 # Tool registry
 TOOLS = {
     "get_driver_info": get_driver_info,
     "send_dummy_notification": send_dummy_notification,
-    "send_overlay_sms": send_overlay_sms
+    "send_overlay_sms": send_overlay_sms,
+    "get_ride_details": get_ride_details,
+    "get_doc_status": get_doc_status
 }
 
 
@@ -64,6 +87,8 @@ TOOLS = {
 TOOL_DESCRIPTIONS = {
     "get_driver_info": "Retrieve driver information and search requests using mobile number",
     "send_dummy_notification": "Send dummy ride request notification to a driver using driver_id",
-    "send_overlay_sms": "Send overlay SMS notification to a driver using driver_id"
+    "send_overlay_sms": "Send overlay SMS notification to a driver using driver_id",
+    "get_ride_details": "Get ride details by ride ID",
+    "get_doc_status": "Get the status of the driver's documents (RC/DL)",
 }
 

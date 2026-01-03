@@ -272,3 +272,141 @@ class SubscriptionClient:
             logger.error(f"Subscription exception: {error_msg}")
             return {"success": False, "error": error_msg}
 
+
+class RideFareBreakupClient:
+    """Client for ride fare breakup API."""
+
+    @staticmethod
+    def get_fare_breakup(ride_id: str) -> Dict[str, Any]:
+        """
+        Get ride fare breakup by ride ID.
+        
+        Args:
+            ride_id: Ride ID
+            
+        Returns:
+            Dictionary containing fare breakup data
+        """
+        headers = {
+            "token": APIConfig.DASHBOARD_TOKEN,
+            "Content-Type": APIConfig.CONTENT_TYPE_JSON,
+        }
+
+        url = APIConfig.RIDE_DETAILS_FARE_BREAKUP_URL.format(ride_id)
+        logger.info(f"Fetching ride fare breakup from: {url}")
+
+        try:
+            resp = requests.get(url, headers=headers)
+            logger.info(f"Fare breakup API responded: {resp.status_code}")
+
+            if resp.status_code != 200:
+                body = resp.text
+                logger.error(f"Fare breakup API failed: status {resp.status_code}, body: {body}")
+                return {
+                    "success": False,
+                    "error": f"Fare breakup API request failed with status {resp.status_code}",
+                    "body": body    
+                }
+            
+            return {
+                "success": True,
+                "data": resp.json()
+            }
+            
+        except Exception as e:
+            error_msg = f"Fare breakup request failed: {str(e)}"
+            logger.error(f"Fare breakup exception: {error_msg}")
+            return {"success": False, "error": error_msg}
+
+
+class RideInfoClient:
+    """Client for ride info API."""
+
+    @staticmethod
+    def get_ride_info(ride_id: str) -> Dict[str, Any]:
+        """
+        Get ride info by ride ID.
+        
+        Args:
+            ride_id: Ride ID
+            
+        Returns:
+            Dictionary containing ride info data
+        """
+        headers = {
+            "token": APIConfig.DASHBOARD_TOKEN,
+            "Content-Type": APIConfig.CONTENT_TYPE_JSON,
+        }
+
+        url = APIConfig.RIDE_DETAILS_INFO_URL.format(ride_id)
+        logger.info(f"Fetching ride info from: {url}")
+
+        try:
+            resp = requests.get(url, headers=headers)
+            logger.info(f"Ride info API responded: {resp.status_code}")
+
+            if resp.status_code != 200:
+                body = resp.text
+                logger.error(f"Ride info API failed: status {resp.status_code}, body: {body}")
+                return {
+                    "success": False,
+                    "error": f"Ride info API request failed with status {resp.status_code}",
+                    "body": body    
+                }
+            
+            return {
+                "success": True,
+                "data": resp.json()
+            }
+            
+        except Exception as e:
+            error_msg = f"Ride info request failed: {str(e)}"
+            logger.error(f"Ride info exception: {error_msg}")
+            return {"success": False, "error": error_msg}
+
+
+
+class DocStatusClient:
+    """Client for doc status API."""
+
+    @staticmethod
+    def get_doc_status(driver_id: str) -> Dict[str, Any]:
+        """
+        Get doc status by driver ID.
+        
+        Args:
+            driver_id: Driver ID
+            
+        Returns:
+            Dictionary containing doc status data
+        """
+        headers = {
+            "token": APIConfig.DASHBOARD_TOKEN,
+            "Content-Type": APIConfig.CONTENT_TYPE_JSON,
+        }
+
+        url = APIConfig.DOC_STATUS_API_URL.format(driver_id)
+        logger.info(f"Fetching doc status from: {url}")
+        
+        try:
+            # resp = requests.get(url, headers=headers)
+            # logger.info(f"Doc status API responded: {resp.status_code}")
+
+            # if resp.status_code != 200:
+            #     body = resp.text
+            #     logger.error(f"Doc status API failed: status {resp.status_code}, body: {body}")
+            #     return {
+            #         "success": False,
+            #         "error": f"Doc status API request failed with status {resp.status_code}",
+            #         "body": body
+            #     }
+            
+            return {
+                "success": True,
+                "data": "your RC is activated to another driver."
+            }
+            
+        except Exception as e:
+            error_msg = f"Doc status request failed: {str(e)}"
+            logger.error(f"Doc status exception: {error_msg}")
+            return {"success": False, "error": error_msg}

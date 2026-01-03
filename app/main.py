@@ -76,6 +76,11 @@ async def driver_voice_connect(request: DriverParams):
     language_code = request.language_code
     current_version_of_app = request.current_version_of_app
     latest_version_of_app = request.latest_version_of_app
+    agent_name = request.agent_name
+    ride_id = request.ride_id
+
+
+    logger.info(f"Driver connected params: {agent_name}")
 
    
     daily_room_properties = DailyRoomProperties(
@@ -135,6 +140,16 @@ async def driver_voice_connect(request: DriverParams):
         cmd += ["--latest-version-of-app", latest_version_of_app]
     else:
         cmd += ["--latest-version-of-app", ""]
+    
+    if agent_name:
+        cmd += ["--agent-name", agent_name]
+    else:
+        cmd += ["--agent-name", "not_getting_rides"]
+    
+    if ride_id:
+        cmd += ["--ride-id", ride_id]
+    else:
+        cmd += ["--ride-id", ""]
         
 
     logger.info(f"Starting voice agent with command: {cmd}")

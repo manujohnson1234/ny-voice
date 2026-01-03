@@ -1,17 +1,21 @@
-# Greeting messages for different languages
+
+
+# Language-specific greetings
 GREETINGS = {
-    "ta": "வணக்கம்! நம்ம யாத்திரி டிரைவர் சப்போர்ட்-க்கு உங்களை வரவேற்கிறோம். ride கிடைக்கலன்னு ஏதாவது issue இருக்கா? நான் உங்களுக்கு எப்படி உதவ முடியும்?",
-    "kn": "ನಮಸ್ಕಾರ! ನಮ್ಮ ಯಾತ್ರಿ ಡ್ರೈವರ್ ಸಪೋರ್ಟ್‌ಗೆ ನಿಮಗೆ ಸ್ವಾಗತ. ride ಸಿಗ್ತಿಲ್ಲ ಅಂತ ಯಾವದಾದ್ರು issue ಇದೆಯಾ? ನಾನು ನಿಮಗೆ ಹೇಗೆ help ಮಾಡಬಹುದು?",
-    "hi": "नमस्ते! नम्मा यात्री ड्राइवर सपोर्ट में आपका स्वागत है। Ride मिलने का issue है क्या? मैं आपकी कैसे help कर सकती हूँ?",
-    "ml": "നമസ്കാരം! നമ്മ യാത്രി ഡ്രൈവർ സപ്പോർട്ടിലേക്ക് നിങ്ങളെ സ്വാഗതം ചെയ്യുന്നു. ഇന്ന് നിങ്ങൾക്ക് എനിക്ക് എങ്ങനെ സഹായിക്കാനാകും?",
+    "ta": "வணக்கம்! நம்ம யாத்திரி support-க்கு வரவேற்கிறோம்",
+    "kn": "ನಮಸ್ಕಾರ! ನಮ್ಮ ಯಾತ್ರಿ support-ಗೆ ಸ್ವಾಗತ",
+    "hi": "नमस्ते! नम्मा यात्री support में आपका स्वागत है",
+    "ml": "നമസ്കാരം! നമ്മ യാത്രി support-ലേക്ക് സ്വാഗതം",
+    "en": "Hello! Welcome to Namma Yatri support"
 }
 
-# Irrelevant question response for different languages
+# Irrelevant question responses
 IRRELEVANT_QUESTION_RESPONSES = {
-    "ta": "sorry, இந்த கேள்விக்கு நான் உதவி செய்ய முடியாது. நான் நம்ம யாத்திரி ஆப் பிரச்சினைகளில் மட்டுமே உதவுவேன்.",
-    "kn": "sorry, ಈ ಪ್ರಶ್ನೆಗೆ ನಾನು ಸಹಾಯ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ. ನಾನು ನಮ್ಮ ಯಾತ್ರಿ ಆಪ್ ಸಮಸ್ಯೆಗಳಲ್ಲಿ ಮಾತ್ರ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.",
-    "hi": "sorry, मैं इस प्रश्न में मदद नहीं कर सकती। मैं केवल नम्मा यात्री ऐप समस्याओं में मदद करती हूं।",
-    "ml": "ക്ഷമിക്കണം, ഈ ചോദ്യത്തിന് എനിക്ക് സഹായിക്കാൻ കഴിയില്ല. ഞാൻ നമ്മ യാത്രി ആപ്പ് പ്രശ്നങ്ങളിൽ മാത്രമേ സഹായിക്കൂ.",
+    "ta": "மன்னிக்கவும், நான் நம்ம யாத்திரி சம்பந்தமான பிரச்சனைகளில் மட்டுமே உதவ முடியும்.",
+    "kn": "ಕ್ಷಮಿಸಿ, ನಾನು ನಮ್ಮ ಯಾತ್ರಿ ಸಂಬಂಧಿತ ಸಮಸ್ಯೆಗಳಲ್ಲಷ್ಟೇ ಸಹಾಯ ಮಾಡಬಹುದು.",
+    "hi": "माफ़ कीजिए, मैं केवल नम्मा यात्री से जुड़े मुद्दों में ही मदद कर सकती हूँ।",
+    "ml": "ക്ഷമിക്കണം, ഞാൻ നമ്മ യാത്രിയുമായി ബന്ധപ്പെട്ട പ്രശ്നങ്ങളിൽ മാത്രമേ സഹായിക്കാനാകൂ.",
+    "en": "Sorry i can only help with nammayatri issues."
 }
 
 # Troubleshooting items for different languages
@@ -132,6 +136,9 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
             STEP 6: BASIC TROUBLESHOOTING (if notification not received)
             Ask the driver to check these basic issues that commonly prevent drivers from receiving rides:
             {troubleshooting_list}. 
+
+
+            **Important** : If the driver mentions 'unblock their account', 'activate their RC', 'need to pay dues', 'payment issues', 'didn't receive payment from a customer', or any other payment-related troubleshooting, tell them to call the {support_team} support team right away, confirm they understand you will involve the support team, then immediately call the bot_fail_to_resolve tool (do not explain the escalation process to the driver).** 
             if the driver checked all the above issues, use bot_fail_to_resolve tool to escalate the call to {support_team} team.
 
             if a driver contacts you about other than these issues, use bot_fail_to_resolve tool to escalate the call to {support_team} team.

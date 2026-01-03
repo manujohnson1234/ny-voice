@@ -6,6 +6,7 @@ import sys
 import wave
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 import aiofiles
 import boto3
 from zoneinfo import ZoneInfo
@@ -23,7 +24,7 @@ from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair, LLMContext
 
 
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIProcessor, RTVIObserver
@@ -54,9 +55,6 @@ from app.agents.voice.driver.tts import get_tts_service
 from app.agents.voice.driver.stt import get_stt_service
 from app.agents.voice.driver.llm import get_llm_service
 
-from app.agents.voice.driver.not_getting_rides.tool_schema import driver_info, send_dummy_request, send_overlay_sms,bot_fail_to_resolve
-from app.agents.voice.driver.not_getting_rides.system_prompt import get_not_getting_rides_system_prompt
-from app.agents.voice.driver.not_getting_rides.function_handler import get_driver_info_handler, send_dummy_notification_handler, send_overlay_sms_handler,bot_fail_to_resolve_handler
 
 from app.agents.voice.driver.utils.handover import HandoverFrame
 
@@ -65,6 +63,9 @@ from app.core import config
 from app.core.session_manager import get_session_manager
 from app.core.session_manager import SessionManager
 
+from app.agents.voice.driver.agents.not_getting_rides.agent import NotGettingRidesAgent
+from app.agents.voice.driver.agents.ride_related_issues.agent import RideIssueAgent
+from app.agents.voice.driver.agents.rc_dl_issues.agent import RC_DL_IssuesAgent
 
 from app.agents.voice.driver.analytics.tracing_setup import setup_tracing
 from langfuse import get_client
@@ -123,17 +124,23 @@ async def save_audio_file(audio: bytes, filename: str, sample_rate: int, num_cha
 
 
 
-async def run_bot(room_url: str, token: str, session_id: str, driver_number: str, language_code: str, current_version_of_app: str, latest_version_of_app: str):
+async def run_bot(room_url: str, token: str, session_id: str, driver_number: str, language_code: str, agent_name: str, current_version_of_app: Optional[str] = None, latest_version_of_app: Optional[str] = None, ride_id: Optional[str] = None):
     # Initialize session manager
     session_manager = get_session_manager()
     
     # Create session with initial data
+    initial_data = {
+        "driver_number": driver_number,
+        "count_tool_calls": {}
+    }
+    
+    # Add ride_id if provided
+    if ride_id:
+        initial_data["ride_id"] = ride_id
+    
     await session_manager.create_session(
         session_id=session_id,
-        initial_data={
-            "driver_number": driver_number,
-            "count_tool_calls": {}
-        }
+        initial_data=initial_data
     )
     logger.info(f"Session {session_id} initialized for driver {driver_number}")
 
@@ -142,44 +149,66 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 
     tts = get_tts_service(language=language_code) 
 
-    agent_for_not_getting_rides = get_llm_service()
+
+    agent = None
+
+    if agent_name == "not_getting_rides":
+        agent = NotGettingRidesAgent(session_id=session_id, language=language_code)
+    elif agent_name == "ride_related_issues":
+        agent = RideIssueAgent(session_id=session_id, language=language_code)
+    elif agent_name == "rc_dl_issues":
+        agent = RC_DL_IssuesAgent(session_id=session_id, language=language_code)
+
+    if not agent:
+        raise ValueError(f"Invalid agent_name: {agent_name}. Must be 'not_getting_rides' or 'ride_related_issues'")
+
+    messages = agent.get_system_prompt()
+    llm = agent.get_llm()
+
+    tools = agent.get_tools()
 
 
-    tools = ToolsSchema(standard_tools=[driver_info,send_dummy_request,send_overlay_sms,bot_fail_to_resolve])
 
-    messages = get_not_getting_rides_system_prompt(language=language_code)
+    # Remove the code start here
+
+    # agent_for_not_getting_rides = get_llm_service()
+
+
+    # tools = ToolsSchema(standard_tools=[driver_info,send_dummy_request,send_overlay_sms,bot_fail_to_resolve])
+
+    # messages = get_not_getting_rides_system_prompt(language=language_code)
     
     
 
-    context = OpenAILLMContext(messages, tools=tools)
-    context_aggregator = agent_for_not_getting_rides.create_context_aggregator(context)
+    context = LLMContext(messages, tools=tools)
+    context_aggregator = LLMContextAggregatorPair(context)
 
 
     # Register function handlers with session_id captured in closure
     # Create wrapper functions that have access to session_id
-    async def get_driver_info_wrapper(params):
-        return await get_driver_info_handler(params, session_id=session_id)
+    # async def get_driver_info_wrapper(params):
+    #     return await get_driver_info_handler(params, session_id=session_id)
     
-    async def send_dummy_notification_wrapper(params):
-        return await send_dummy_notification_handler(params, session_id=session_id)
+    # async def send_dummy_notification_wrapper(params):
+    #     return await send_dummy_notification_handler(params, session_id=session_id)
     
-    async def send_overlay_sms_wrapper(params):
-        return await send_overlay_sms_handler(params, session_id=session_id)
+    # async def send_overlay_sms_wrapper(params):
+    #     return await send_overlay_sms_handler(params, session_id=session_id)
     
-    async def bot_fail_to_resolve_wrapper(params):
-        return await bot_fail_to_resolve_handler(params, session_id=session_id)
+    # async def bot_fail_to_resolve_wrapper(params):
+    #     return await bot_fail_to_resolve_handler(params, session_id=session_id)
 
-    agent_for_not_getting_rides.register_function("get_driver_info", get_driver_info_wrapper)
-    agent_for_not_getting_rides.register_function("send_dummy_request", send_dummy_notification_wrapper)
-    agent_for_not_getting_rides.register_function("send_overlay_sms", send_overlay_sms_wrapper)
-    agent_for_not_getting_rides.register_function("bot_fail_to_resolve", bot_fail_to_resolve_wrapper)
+    # agent_for_not_getting_rides.register_function("get_driver_info", get_driver_info_wrapper)
+    # agent_for_not_getting_rides.register_function("send_dummy_request", send_dummy_notification_wrapper)
+    # agent_for_not_getting_rides.register_function("send_overlay_sms", send_overlay_sms_wrapper)
+    # agent_for_not_getting_rides.register_function("bot_fail_to_resolve", bot_fail_to_resolve_wrapper)
+
+    # Remove the code end here
+
+
 
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-
-
-    # @llm.event_handler("on_function_calls_started")
-    # async def on_function_calls_started(llm, function_calls):
 
 
 
@@ -223,7 +252,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
             stt,
             # stt_debug,  # STT output for debugging
             context_aggregator.user(),  # User responses
-            agent_for_not_getting_rides,  # LLM
+            llm,  # LLM
             tts,  # TTS
             transport.output(),  # Transport bot output
             audiobuffer,
@@ -349,7 +378,7 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 
 
     @transport.event_handler("on_joined")
-    async def on_joined(transport):
+    async def on_joined(transport, participant):
         await task.queue_frame(FilterEnableFrame(True))
 
 
@@ -409,9 +438,11 @@ def parse_args():
     parser.add_argument("--language-code", type=str, required=True, help="Language code")
     parser.add_argument("--current-version-of-app", type=str, required=True, help="Current version of app")
     parser.add_argument("--latest-version-of-app", type=str, required=True, help="Latest version of app")
+    parser.add_argument("--agent-name", type=str, required=True, help="Agent name")
+    parser.add_argument("--ride-id", type=str, required=False, help="Ride ID")
 
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
-    asyncio.run(run_bot(args.url, args.token, args.session_id, args.driver_number, args.language_code, args.current_version_of_app, args.latest_version_of_app))
+    asyncio.run(run_bot(args.url, args.token, args.session_id, args.driver_number, args.language_code, args.agent_name, args.current_version_of_app, args.latest_version_of_app, args.ride_id))
