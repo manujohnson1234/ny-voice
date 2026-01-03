@@ -16,6 +16,9 @@ class APIConfig:
     DUMMY_NOTIFICATION_API_URL = "https://dashboard.beckn.juspay.in/api/bpp/driver-offer/NAMMA_YATRI_PARTNER/Bangalore/driver/{}/sendDummyNotification"
     SUBSCRIPTION_API_URL = "https://dashboard.beckn.juspay.in/api/bpp/driver-offer/NAMMA_YATRI_PARTNER/Bangalore/plan/{}/\"YATRI_SUBSCRIPTION\""
     OVERLAY_API_URL = "https://dashboard.beckn.juspay.in/api/bpp/driver-offer/NAMMA_YATRI_PARTNER/driver/{}/sendSms"
+    RIDE_DETAILS_FARE_BREAKUP_URL = "https://dashboard.beckn.juspay.in/api/bpp/driver-offer/NAMMA_YATRI_PARTNER/Bangalore/ride/{}/fareBreakUp"
+    RIDE_DETAILS_INFO_URL = "https://dashboard.beckn.juspay.in/api/bpp/driver-offer/NAMMA_YATRI_PARTNER/Bangalore/ride/{}/info"
+    DOC_STATUS_API_URL = ""
     
     # API Keys
     DRIVER_INFO_API_KEY = os.getenv("DRIVER_INFO_API_KEY", "")
