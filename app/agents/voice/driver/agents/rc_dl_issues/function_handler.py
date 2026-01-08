@@ -3,6 +3,7 @@ import json
 import os
 from loguru import logger
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.frames.frames import FunctionCallResultProperties
 from app.core.session_manager import get_session_manager
 
 from typing import Dict
@@ -35,7 +36,7 @@ async def call_mcp_tool(tool_name: str, parameters: dict = None):
 class RC_DL_IssuesHandlers:
 
     @staticmethod
-    async def get_doc_status_handler(params: FunctionCallParams, session_id: str = None):
+    async def get_doc_status_handler(params: FunctionCallParams, session_id: str = None, language: str = "ta"):
         """Handler for get_doc_status tool"""
         session_manager = get_session_manager()
 
@@ -45,7 +46,7 @@ class RC_DL_IssuesHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result, properties=FunctionCallResultProperties(run_llm=True))
             return
         
         mobile_number = await session_manager.get_value(session_id, "driver_number")
@@ -56,12 +57,13 @@ class RC_DL_IssuesHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result, properties=FunctionCallResultProperties(run_llm=True))
             return
 
         result = await call_mcp_tool("get_doc_status", {"mobile_number": mobile_number})
 
-        await params.result_callback(result)
+        logger.info(f"result from get_doc_status: {result}")
+        await params.result_callback(result, properties=FunctionCallResultProperties(run_llm=True))
 
     @staticmethod
     async def bot_fail_to_resolve_handler(params: FunctionCallParams, session_id: str = None):
@@ -74,7 +76,7 @@ class RC_DL_IssuesHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result, properties=FunctionCallResultProperties(run_llm=True))
             return
 
         await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")

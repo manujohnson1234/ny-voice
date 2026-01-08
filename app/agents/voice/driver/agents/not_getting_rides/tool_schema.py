@@ -1,3 +1,4 @@
+from typing import List
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 
@@ -39,5 +40,5 @@ bot_fail_to_resolve = FunctionSchema(
     required=[]
 )
 
-def get_not_getting_rides_tool_schema():
-    return ToolsSchema(standard_tools=[driver_info, send_dummy_request, send_overlay_sms, bot_fail_to_resolve])
+def get_not_getting_rides_tool_schema() -> List[FunctionSchema]:
+    return [driver_info, send_dummy_request, send_overlay_sms, bot_fail_to_resolve]

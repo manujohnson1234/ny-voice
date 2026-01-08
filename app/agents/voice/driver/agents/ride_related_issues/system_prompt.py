@@ -18,11 +18,11 @@ SUPPORT_TEAM = {
 
 
 INITIAL_MOVE = {
-  "ta": "வணக்கம், நம்ம யாத்திரி சப்போர்ட்-கு வரவேற்கிறோம். நான் உங்களுக்கு எப்படி உதவ முடியும்?",
-  "kn": "ನಮಸ್ಕಾರ, ನಮ್ಮ ಯಾತ್ರಿ ಸಪೋರ್ಟ್‌ಗೆ ಸ್ವಾಗತ. ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?",
-  "hi": "नमस्ते, नम्मा यात्री सपोर्ट में आपका स्वागत है। मैं आपकी कैसे मदद कर सकती हूँ?",
-  "ml": "ഹലോ, നമ്മ യാത്രി സപ്പോർട്ടിലേക്ക് സ്വാഗതം. ഞാൻ നിങ്ങൾക്ക് എങ്ങനെ സഹായിക്കാം?",
-  "en": "Hi, welcome to Namma Yatri support. Can I help you?"
+  "ta": "வணக்கம்! இந்த ரைடு-ல நீங்கள் எந்த பிரச்சனையை எதிர்கொண்டீர்கள் என்று சொல்லுங்கள், நான் உங்களுக்கு மேலும் உதவ முடியும்.",
+  "kn": "ನಮಸ್ಕಾರ! ಈ ರೈಡ್‌ನಲ್ಲಿ ನಿಮಗೆ ಯಾವ ಸಮಸ್ಯೆ ಎದುರಾಯಿತು ಎಂದು ದಯವಿಟ್ಟು ತಿಳಿಸಿ, ಆಗ ನಾನು ನಿಮಗೆ ಸಹಾಯ ಮಾಡಬಹುದು.",
+  "hi": "नमस्ते! इस राइड में आपको कौन-सी समस्या हुई, कृपया बताइए, ताकि मैं आपकी मदद कर सकूँ।",
+  "ml": "നമസ്കാരം! നിങ്ങൾക്ക് ഈ റൈഡ്-ിൽ എന്ത് പ്രശ്നം ഉണ്ടായിരുന്നത്? പറയൂ.",
+  "en": "Hi! Please tell me what issue you faced with this ride, so I can help you further."
 }
 
 def get_ride_related_issues_system_prompt(language: str = "ta"):
@@ -51,28 +51,29 @@ def get_ride_related_issues_system_prompt(language: str = "ta"):
             You have access to these tools:
             1. get_ride_details - Get the ride details like distance, fare, toll charges, etc. Parameters: issue (required) - can be 'TOLL_CHARGES' or 'FARE'
             2. bot_fail_to_resolve - tool to escalate the call to {support_team} team.
+            3. change_agent - tool to change the agent to the next agent. Parameters: agent_name (required) - 'router'
 
             NAMMA YATRI DRIVER SUPPORT WORKFLOW:
 
             STEP 1: ASK ABOUT THE ISSUE
-            {initial_move} Ask the driver what specific issue they are facing with their ride.
+            "{initial_move}" 
 
             STEP 2: APOLOGIZE AND GET RIDE DETAILS
-            Apologize to the driver for the inconvenience they are facing.
             
-            Then call the get_ride_details tool based on their issue:
+            Call the get_ride_details tool based on their issue:
             * If the issue is related to toll charges, call get_ride_details with parameter issue='TOLL_CHARGES'
             * If the issue is related to fare calculation, call get_ride_details with parameter issue='FARE'
             
             Based on the response from get_ride_details:
-            * If the issue is with FARE: Inform the driver about the estimated fare and actual fare metrics. Explain the difference clearly.
-            * If the issue is with TOLL_CHARGES: Inform the driver about the estimated toll charges and actual toll charges, if the estimated and the actual toll charge is None which means their is no toll charges. Explain the difference clearly.
+            * Apologize to the driver for the inconvenience they are facing.
+            * If the issue is with FARE: Inform the driver about the estimated fare and actual fare. And any other parameters which has difference.  
+            * If the issue is with TOLL_CHARGES: Inform the driver about the estimated toll charges and actual toll charges, if the estimated and the actual toll charge is None which means their is no toll charges.
 
             STEP 3: ASK FOR FURTHER ASSISTANCE
-            After explaining the ride details, ask the driver if they need any further assistance regarding the this issue.
-            
-            If they need more help or are not satisfied with the explanation, use the bot_fail_to_resolve tool to escalate the call to the {support_team} team.
+            * Ask the driver if they need any further assistance regarding the this issue
+            * If they need more help  use the bot_fail_to_resolve tool
 
+            If the driver asks about rc or dl issues or ride related issues or not getting rides issues, use the change_agent tool with parameter agent_name='router' to change the agent to the router agent.
 
             If the driver asks irrelevant questions unrelated to ride issues, tell them: "{irrelevant_response}"
 

@@ -3,6 +3,7 @@ import json
 import os
 from loguru import logger
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.frames.frames import FunctionCallResultProperties
 from app.core.session_manager import get_session_manager
 
 from typing import Dict
@@ -32,7 +33,7 @@ async def call_mcp_tool(tool_name: str, parameters: dict = None):
 
 class NotGettingRidesHandlers:
 
-
+    @staticmethod
     async def get_driver_info_handler(params: FunctionCallParams, session_id: str = None):
         """Handler for get_driver_info tool"""
         session_manager = get_session_manager()
@@ -44,7 +45,7 @@ class NotGettingRidesHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result,properties=FunctionCallResultProperties(run_llm=True))
             return
 
         
@@ -65,7 +66,7 @@ class NotGettingRidesHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result,properties=FunctionCallResultProperties(run_llm=True))
             return
         
         logger.info(f"Retrieved driver_number {driver_number} from session {session_id}")
@@ -107,9 +108,10 @@ class NotGettingRidesHandlers:
             else:
                 logger.error(f"driverId not found in result for session {session_id}. Result: {result}")
         
-        await params.result_callback(result)
+        await params.result_callback(result,properties=FunctionCallResultProperties(run_llm=True))
 
-    async def send_dummy_notification_handler(params: FunctionCallParams, session_id: str = None):
+    @staticmethod
+    async def send_dummy_request_handler(params: FunctionCallParams, session_id: str = None):
         """Handler for send_dummy_notification tool"""
         session_manager = get_session_manager()
         
@@ -120,7 +122,7 @@ class NotGettingRidesHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result,properties=FunctionCallResultProperties(run_llm=True))
             return
         
         count_tool_calls = await session_manager.get_value(session_id, "count_tool_calls")
@@ -138,7 +140,7 @@ class NotGettingRidesHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result,properties=FunctionCallResultProperties(run_llm=True))
             return
         
         logger.info(f"Retrieved driver_id {driver_id} from session {session_id}")
@@ -148,9 +150,10 @@ class NotGettingRidesHandlers:
                 await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
                 await session_manager.set_value(session_id, "reason", "error_due_to_mcp_or_common")
                 return
-        await params.result_callback(result)
+        await params.result_callback(result,properties=FunctionCallResultProperties(run_llm=True))
 
 
+    @staticmethod
     async def send_overlay_sms_handler(params: FunctionCallParams, session_id: str = None):
         """Handler for send_dues_overlay tool"""
         session_manager = get_session_manager()
@@ -162,7 +165,7 @@ class NotGettingRidesHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result,properties=FunctionCallResultProperties(run_llm=True))
             return
 
         count_tool_calls = await session_manager.get_value(session_id, "count_tool_calls")
@@ -179,7 +182,7 @@ class NotGettingRidesHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result,properties=FunctionCallResultProperties(run_llm=True))
             return
         
         logger.info(f"Retrieved driver_id {driver_id} from session {session_id}")
@@ -189,10 +192,10 @@ class NotGettingRidesHandlers:
                 await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
                 await session_manager.set_value(session_id, "reason", "error_due_to_mcp_or_common")
                 return
-        await params.result_callback(result)     
+        await params.result_callback(result,properties=FunctionCallResultProperties(run_llm=True))     
 
 
-
+    @staticmethod
     async def bot_fail_to_resolve_handler(params: FunctionCallParams, session_id: str = None):
         """Handler for bot_fail_to_resolve tool"""
         session_manager = get_session_manager()

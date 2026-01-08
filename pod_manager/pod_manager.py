@@ -66,6 +66,9 @@ class DriverParams(BaseModel):
     language_code: Optional[str] = None
     current_version_of_app: Optional[str] = None
     latest_version_of_app: Optional[str] = None
+    ride_id: Optional[str] = None
+    agent_name: Optional[str] = None
+
 
 class RegisterReq(BaseModel):
     pod_name: str
@@ -335,7 +338,9 @@ async def assign_call(req: DriverParams):
                         "phoneNumber": req.phoneNumber,
                         "language_code": req.language_code,
                         "current_version_of_app": req.current_version_of_app,
-                        "latest_version_of_app": req.latest_version_of_app
+                        "latest_version_of_app": req.latest_version_of_app,
+                        "agent_name": req.agent_name,
+                        "ride_id": req.ride_id
                     }
                 )
                 response.raise_for_status()
