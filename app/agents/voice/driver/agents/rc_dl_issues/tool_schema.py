@@ -1,3 +1,4 @@
+from typing import List
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 
@@ -16,5 +17,5 @@ bot_fail_to_resolve = FunctionSchema(
     required = []
 )
 
-def get_rc_dl_issues_tool_schema():
-    return ToolsSchema(standard_tools=[get_doc_status, bot_fail_to_resolve])
+def get_rc_dl_issues_tool_schema() -> List[FunctionSchema]:
+    return [get_doc_status, bot_fail_to_resolve]

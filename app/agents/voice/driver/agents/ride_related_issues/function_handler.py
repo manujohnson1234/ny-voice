@@ -5,6 +5,7 @@ from typing import Dict
 from loguru import logger
 
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.frames.frames import FunctionCallResultProperties
 from app.core.session_manager import get_session_manager
 
 
@@ -43,7 +44,7 @@ class RideIssueHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result,properties=FunctionCallResultProperties(run_llm=True))
             return
 
         ride_id = await session_manager.get_value(session_id, "ride_id")
@@ -55,11 +56,11 @@ class RideIssueHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result,properties=FunctionCallResultProperties(run_llm=True))
             return
 
         result = await call_mcp_tool("get_ride_details", {"ride_id": ride_id, "issue_type": issue_type})
-        await params.result_callback(result)
+        await params.result_callback(result,properties=FunctionCallResultProperties(run_llm=True))
 
     @staticmethod
     async def bot_fail_to_resolve_handler(params: FunctionCallParams, session_id: str = None):
@@ -72,7 +73,7 @@ class RideIssueHandlers:
                 "success": False,
                 "error": True
             }
-            await params.result_callback(error_result)
+            await params.result_callback(error_result,properties=FunctionCallResultProperties(run_llm=True))
             return
         
         await session_manager.set_value(session_id, "bot_not_able_to_resolve", "true")
@@ -82,7 +83,7 @@ class RideIssueHandlers:
             "success": True,
             "message": "Escalating to support team"
         }
-        await params.result_callback(result)
+        await params.result_callback(result,properties=FunctionCallResultProperties(run_llm=True))
 
     def get_all_handlers(self) -> Dict[str, callable]:
         """

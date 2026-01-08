@@ -1,16 +1,18 @@
-from typing import Optional
+from typing import Optional, List
 
 from loguru import logger
 
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.llm_service import LLMService
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.adapters.schemas.function_schema import FunctionSchema
 
 from app.core.session_manager import get_session_manager
 from app.agents.voice.driver.llm import get_llm_service
 from app.agents.voice.driver.agents.not_getting_rides.function_handler import NotGettingRidesHandlers
 from app.agents.voice.driver.agents.not_getting_rides.system_prompt import get_not_getting_rides_system_prompt
 from app.agents.voice.driver.agents.not_getting_rides.tool_schema import get_not_getting_rides_tool_schema
+
 
 
 
@@ -32,8 +34,8 @@ class NotGettingRidesAgent:
         async def get_driver_info_wrapper(params):
             return await self._handlers.get_driver_info_handler(params, session_id=self.session_id)
         
-        async def send_dummy_notification_wrapper(params):
-            return await self._handlers.send_dummy_notification_handler(params, session_id=self.session_id)
+        async def send_dummy_request_wrapper(params):
+            return await self._handlers.send_dummy_request_handler(params, session_id=self.session_id)
         
         async def send_overlay_sms_wrapper(params):
             return await self._handlers.send_overlay_sms_handler(params, session_id=self.session_id)
@@ -43,7 +45,7 @@ class NotGettingRidesAgent:
 
 
         self.llm.register_function("get_driver_info", get_driver_info_wrapper)
-        self.llm.register_function("send_dummy_notification", send_dummy_notification_wrapper)
+        self.llm.register_function("send_dummy_request", send_dummy_request_wrapper)
         self.llm.register_function("send_overlay_sms", send_overlay_sms_wrapper)
         self.llm.register_function("bot_fail_to_resolve", bot_fail_to_resolve_wrapper)
 
@@ -53,5 +55,5 @@ class NotGettingRidesAgent:
     def get_system_prompt(self) -> str:
         return get_not_getting_rides_system_prompt(language=self.language)
 
-    def get_tools(self) -> ToolsSchema:
+    def get_tools(self) -> List[FunctionSchema]:
         return get_not_getting_rides_tool_schema()

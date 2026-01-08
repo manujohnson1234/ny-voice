@@ -1,10 +1,15 @@
+from typing import List
+
 from pipecat.services.llm_service import LLMService
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from app.core.session_manager import get_session_manager
 from app.agents.voice.driver.llm import get_llm_service
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+
 from app.agents.voice.driver.agents.rc_dl_issues.function_handler import RC_DL_IssuesHandlers
 from app.agents.voice.driver.agents.rc_dl_issues.system_prompt import get_rc_dl_issues_system_prompt
 from app.agents.voice.driver.agents.rc_dl_issues.tool_schema import get_rc_dl_issues_tool_schema
+
 
 
 class RC_DL_IssuesAgent:
@@ -22,7 +27,7 @@ class RC_DL_IssuesAgent:
     def _register_tools(self):
 
         async def get_doc_status_wrapper(params):
-            return await self._handlers.get_doc_status_handler(params, session_id=self.session_id)
+            return await self._handlers.get_doc_status_handler(params, session_id=self.session_id, language=self.language)
         
         async def bot_fail_to_resolve_wrapper(params):
             return await self._handlers.bot_fail_to_resolve_handler(params, session_id=self.session_id)
@@ -36,5 +41,5 @@ class RC_DL_IssuesAgent:
     def get_system_prompt(self) -> str:
         return get_rc_dl_issues_system_prompt(language=self.language)
 
-    def get_tools(self) -> ToolsSchema:
+    def get_tools(self) -> List[FunctionSchema]:
         return get_rc_dl_issues_tool_schema()

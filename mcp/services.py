@@ -279,6 +279,12 @@ class RideDetailsService:
             estimated_fare = ride_info.get('estimatedFare', None)
             actual_fare = ride_info.get('actualFare', None)
 
+            estimated_distance = ride_info.get('rideDistanceEstimated', None)
+            actual_distance = ride_info.get('rideDistanceActual', None)
+            
+
+            
+
             # If fares match, return simplified response
             if estimated_fare and actual_fare and estimated_fare == actual_fare:
                 logger.info(f"Fares match - Estimated: {estimated_fare}, Actual: {actual_fare}")
@@ -287,6 +293,10 @@ class RideDetailsService:
                     "estimated_fare": estimated_fare,
                     "actual_fare": actual_fare
                 }
+
+
+            response = {"success": True}
+
 
             # Extract detailed fare breakdown
             estimated_baseFare = estimated_charges.get('baseFare', None)
@@ -306,20 +316,53 @@ class RideDetailsService:
             estimated_driverSelectedFare = estimated_charges.get('driverSelectedFare', None)
             actual_driverSelectedFare = actual_charges.get('driverSelectedFare', None)
 
+            rideExtraTimeFare = actual_charges.get('rideExtraTimeFare', None)
+            estimated_rideExtraTimeFare = estimated_charges.get('rideExtraTimeFare', None)
+
+            waiting_charge = actual_charges.get('waitingCharge', None)
+
+            logger.info(f"actual_charges: {waiting_charge}")
+
+            actual_toll_charges = actual_charges.get('tollCharges', None)
+            estimated_toll_charges = estimated_charges.get('tollCharges', None)
+
+            actual_service_charge = actual_charges.get('serviceCharge', None)
+            estimated_service_charge = estimated_charges.get('serviceCharge', None)
+
+            # Only add parameters to response if there are differences
+            if estimated_baseFare != actual_baseFare:
+                response["estimated_baseFare"] = estimated_baseFare
+                response["actual_baseFare"] = actual_baseFare
+            
+            if estimated_extraKmFare != actual_extraKmFare:
+                response["estimated_extraKmFare"] = estimated_extraKmFare
+                response["actual_extraKmFare"] = actual_extraKmFare
+            
+            if estimated_deadKmFare != actual_deadKmFare:
+                response["estimated_deadKmFare"] = estimated_deadKmFare
+                response["actual_deadKmFare"] = actual_deadKmFare
+            
+            if estimated_driverSelectedFare != actual_driverSelectedFare:
+                response["estimated_driverSelectedFare"] = estimated_driverSelectedFare
+                response["actual_driverSelectedFare"] = actual_driverSelectedFare
+
+            if waiting_charge:
+                response["waiting_charge"] = waiting_charge
+
+            if (rideExtraTimeFare != estimated_rideExtraTimeFare):
+                response["rideExtraTimeFare"] = rideExtraTimeFare
+                response["estimated_rideExtraTimeFare"] = estimated_rideExtraTimeFare
+
+            if (estimated_toll_charges != actual_toll_charges):
+                response["estimated_toll_charges"] = estimated_toll_charges
+                response["actual_toll_charges"] = actual_toll_charges
+
+            if (estimated_service_charge != actual_service_charge):
+                response["estimated_service_charge"] = estimated_service_charge
+                response["actual_service_charge"] = actual_service_charge
+
             logger.info(f"Fare breakdown retrieved - Estimated Fare: {estimated_fare}, Actual Fare: {actual_fare}")
-            return {
-                "success": True,
-                "estimated_fare": estimated_fare,
-                "actual_fare": actual_fare,
-                "estimated_baseFare": estimated_baseFare,
-                "actual_baseFare": actual_baseFare,
-                "estimated_extraKmFare": estimated_extraKmFare,
-                "actual_extraKmFare": actual_extraKmFare,
-                "estimated_deadKmFare": estimated_deadKmFare,
-                "actual_deadKmFare": actual_deadKmFare,
-                "estimated_driverSelectedFare": estimated_driverSelectedFare,
-                "actual_driverSelectedFare": actual_driverSelectedFare
-            }
+            return response
         else:
             error_msg = f"Invalid issue_type: {issue_type}. Must be 'TOLL_CHARGES' or 'FARE'"
             logger.error(error_msg)

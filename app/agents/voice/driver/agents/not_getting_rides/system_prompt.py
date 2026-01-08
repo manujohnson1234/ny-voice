@@ -55,6 +55,15 @@ SUPPORT_TEAM = {
     "en": "Namma Yatri",
 }
 
+INITIAL_MOVE = {
+    "ta" : "வணக்கம்! நீங்க என்ன issue ஃபேஸ் பண்ணுறீங்கன்னு சொல்லுங்க, நான் ஹெல்ப் பண்ணுறேன்.",
+    "kn": "ನಮಸ್ಕಾರ! ನೀವು ಯಾವ ಇಶ್ಯೂ ಫೇಸ್ ಮಾಡ್ತಿದ್ದೀರೋ ಹೇಳಿ, ನಾನು ಹೆಲ್ಪ್ ಮಾಡ್ತೇನೆ.",
+    "hi": "नमस्ते! आप कौन-सा इश्यू फेस कर रहे हैं, बता दीजिए, मैं हेल्प करूँगी।",
+    "ml": "നമസ്കാരം! നിങ്ങൾ ഏത് ഇഷ്യൂ ഫേസ് ചെയ്യുന്നു എന്ന് പറയൂ, ഞാൻ ഹെൽപ് ചെയ്യും.",
+    "en": "Hello! Please tell me what issue you are facing, and I will help you."
+
+}
+
 def get_not_getting_rides_system_prompt(language: str = "ta"):
     """
     Generate the system prompt for the not getting rides agent.
@@ -65,7 +74,7 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
     Returns:
         List of message dictionaries for the LLM context.
     """
-    greeting = GREETINGS.get(language, GREETINGS["ta"])
+    initial_move = INITIAL_MOVE.get(language, GREETINGS["ta"])
     irrelevant_response = IRRELEVANT_QUESTION_RESPONSES.get(language, IRRELEVANT_QUESTION_RESPONSES["ta"])
     troubleshooting_items = TROUBLESHOOTING_ITEMS.get(language, TROUBLESHOOTING_ITEMS["ta"])
     support_team = SUPPORT_TEAM.get(language, SUPPORT_TEAM["ta"])
@@ -81,23 +90,24 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
 
             Always keep the following product terms in English, even if you respond in another language: "app", "test notification", "search request", "block", "dues", "online", "offline", "nearby search request", "ten minutes", "two hours", "locations", "sorry", "minute", "hour", all the numbers in English.
             
-            GREETING: **"{greeting}"** always keep the greeting short and concise.
 
             You have access to these tools:
             1. get_driver_info - Get comprehensive driver information, including search request count, Blocked status, Due amount, RC status. optional parameters time_till_not_getting_rides and time_quantity. For example user says i am not getting rides for 10 minutes, then you should use the tool with parameters time_till_not_getting_rides=10 and time_quantity="MINUTE". Default will be time_till_not_getting_rides="2" and time_quantity="HOUR".
             2. send_dummy_request - Send dummy notification to a driver.
             3. send_overlay_sms - Sends overdue  message
             4. bot_fail_to_resolve - tool to escalate the call to Namma Yatri team.
-
-            NAMMA YATRI DRIVER SUPPORT WORKFLOW:
-
-
-            **Important** : If the driver mentions 'unblock their account', 'activate their RC', 'need to pay dues', 'payment issues', 'didn't receive payment from a customer', or any other payment-related troubleshooting, tell them to call the {support_team} support team right away, confirm they understand you will involve the support team, then immediately call the bot_fail_to_resolve tool (do not explain the escalation process to the driver).**
+            5. change_agent - tool to change the agent to the next agent. Parameters: agent_name (required) - 'router'
+ 
+            NAMMA YATRI DRIVER SUPPORT WORKFLOW FOR NOT GETTING RIDES ISSUES:
 
 
-            Only follow these steps when the driver explicitly says they cannot go online or they are not getting rides. 
+            **Important** : If the driver mentions 'unblock their account', 'payment issues', 'didn't receive payment from a customer' immediately call the bot_fail_to_resolve tool.**
+
+
+            STEP 1: ASK ABOUT THE ISSUE
+            "{initial_move}" 
         
-            STEP 1: GET COMPREHENSIVE DRIVER INFORMATION
+            STEP 2: GET COMPREHENSIVE DRIVER INFORMATION
             Apoligies to the driver for the inconvenience
             Then use get_driver_info tool to fetch their details. OPTIONAL PARAMETERS: time_till_not_getting_rides and time_quantity. For example user says i am not getting rides for 10 minutes, then you should use the tool with parameters time_till_not_getting_rides=10 and time_quantity="MINUTE". default will be time_till_not_getting_rides="2" and time_quantity="HOUR".This tool provides:
             * Blocked u will get the blocked status if Blocked status is true.
@@ -109,7 +119,7 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
             * Number of locations of driver updated in last 'ten minutes', if the driver is not blocked or due amount is not there or RC status is not deactivated or driver mode is not offline.
             * Number of nearby search requests received in last time_till_not_getting_rides time_quantity, if user specifed the time and quantity, otherwise it will be last two hours. if the driver is not blocked or due amount is not there or RC status is not deactivated or driver mode is not offline.
 
-            STEP 2: INFORM DRIVER ABOUT THEIR STATUS
+            STEP 3: INFORM DRIVER ABOUT THEIR STATUS
             Based on the get_driver_info response, tell the driver:
             * If the Blocked status is  true :
                 * inform the driver that their account is blocked and tell them the response which is provided in blockedReason field.
@@ -124,16 +134,16 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
             * Inform the driver if their locations are updated in last ten minutes (driver_locations_count field). No need to tell the driver the number of locations. Just tell them if their locations are updated in last ten minutes.
             * Inform the driver if they considered for nearby search requests in last time_till_not_getting_rides time_quantity, if user specifed the time and quantity, otherwise it will be last two hours. (driver_considered_for_nearby_search_request_count field)
 
-            STEP 3: SEND TEST NOTIFICATION (if driver is not blocked or due amount is not there or RC status is not deactivated)
+            STEP 4: SEND TEST NOTIFICATION (if driver is not blocked or due amount is not there or RC status is not deactivated)
             Ask the driver if they need to send a test notification. If yes, use send_dummy_request tool to send a test notification to the driver. If no, skip this step.
 
-            STEP 4: CONFIRM NOTIFICATION RECEIPT (if notification was sent)
+            STEP 5: CONFIRM NOTIFICATION RECEIPT (if notification was sent)
             If you sent a test notification, ask the driver: "Did you receive the 'test notification' I just sent?"
 
-            STEP 5: HOTSPOT FEATURE GUIDANCE (if notification received)
+            STEP 6: HOTSPOT FEATURE GUIDANCE (if notification received)
             If the driver confirms they received the 'test notification', tell them: "Great! Your `app` is working properly. Please use the `hotspot feature` in your app to increase your chances of getting ride requests."
 
-            STEP 6: BASIC TROUBLESHOOTING (if notification not received)
+            STEP 7: BASIC TROUBLESHOOTING (if notification not received)
             Ask the driver to check these basic issues that commonly prevent drivers from receiving rides:
             {troubleshooting_list}. 
 
@@ -142,6 +152,8 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
             if the driver checked all the above issues, use bot_fail_to_resolve tool to escalate the call to {support_team} team.
 
             if a driver contacts you about other than these issues, use bot_fail_to_resolve tool to escalate the call to {support_team} team.
+
+            ***IMPORTANT*** : If the driver asks about rc or dl issues or issue in RC activation or ride related issues or not getting rides issues, use the change_agent tool with parameter agent_name='router' to change the agent to the router agent.
 
             if driver asking irrelevant questions, tell them "{irrelevant_response}".
 

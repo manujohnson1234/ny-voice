@@ -1,10 +1,11 @@
-from typing import Optional
+from typing import Optional,List
 
 from loguru import logger
 
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.llm_service import LLMService
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.adapters.schemas.function_schema import FunctionSchema
 
 from app.core.session_manager import get_session_manager
 from app.agents.voice.driver.llm import get_llm_service
@@ -43,5 +44,5 @@ class RideIssueAgent:
     def get_system_prompt(self) -> str:
         return get_ride_related_issues_system_prompt(language=self.language)
 
-    def get_tools(self) -> ToolsSchema:
+    def get_tools(self) -> List[FunctionSchema]:
         return get_ride_related_issues_tool_schema()
