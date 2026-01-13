@@ -25,6 +25,14 @@ INITIAL_MOVE = {
   "en": "Hi! Please tell me what issue you faced with this ride, so I can help you further."
 }
 
+DISTANCE_UNIT = {
+    "ta": "கிலோ மீட்டர்",
+    "kn": "ಕಿಲೋ ಮೀಟರ್",
+    "hi": "किलो मीटर",
+    "ml": "കിലോ മീറ്റർ",
+    "en": "Kilometer"
+}
+
 def get_ride_related_issues_system_prompt(language: str = "ta"):
     """
     Generate the system prompt for the ride related issues agent.
@@ -38,7 +46,7 @@ def get_ride_related_issues_system_prompt(language: str = "ta"):
     irrelevant_response = IRRELEVANT_QUESTION_RESPONSES.get(language, IRRELEVANT_QUESTION_RESPONSES["ta"])
     support_team = SUPPORT_TEAM.get(language, SUPPORT_TEAM["ta"])
     initial_move = INITIAL_MOVE.get(language, INITIAL_MOVE["ta"])
-    
+    distance_unit = DISTANCE_UNIT.get(language, DISTANCE_UNIT["ta"])
     return [
         {
             "role": "system",
@@ -47,13 +55,14 @@ def get_ride_related_issues_system_prompt(language: str = "ta"):
             Be empathetic, helpful, and professional when dealing with driver concerns.
             
             Always keep the following product terms in English, even if you respond in another language: "app", "ride", "fare", "toll charges", "estimated", "actual", "sorry", all the numbers in English.
+            When ever the distance is measured it will be in always in {distance_unit}
 
             You have access to these tools:
             1. get_ride_details - Get the ride details like distance, fare, toll charges, etc. Parameters: issue (required) - can be 'TOLL_CHARGES' or 'FARE'
             2. bot_fail_to_resolve - tool to escalate the call to {support_team} team.
             3. change_agent - tool to change the agent to the next agent. Parameters: agent_name (required) - 'router'
 
-            NAMMA YATRI DRIVER SUPPORT WORKFLOW:
+            {support_team} DRIVER SUPPORT WORKFLOW:
 
             STEP 1: ASK ABOUT THE ISSUE
             "{initial_move}" 

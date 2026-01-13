@@ -1,5 +1,5 @@
 """ClickHouse database operations."""
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime, timedelta, timezone
 from clickhouse_driver import Client
 from loguru import logger
@@ -147,7 +147,90 @@ class ClickHouseClient:
         except Exception as e:
             logger.error(f"Error querying driver locations: {str(e)}")
             return 0
+    
+    def query_uploaded_image(self, driver_id: str, document_type: str) -> Any:
+        client = self.get_client()
+        if client is None:
+            logger.warning("ClickHouse client is not available, returning empty results")
+            return {"success": False, "message": "ClickHouse client is not available"}
         
+        if not driver_id:
+            logger.error("driver_id is required for ClickHouse query")
+            return {"success": False, "message": "driver_id is required"}
+        
+        try:
+            # Get column names first
+            columns_result = client.execute(f"""
+                SELECT name 
+                FROM system.columns 
+                WHERE database = 'atlas_driver_offer_bpp' 
+                AND table = 'image'
+                ORDER BY position;
+            """)
+            column_names = [col[0] for col in columns_result]
+            
+            # Get the data
+            rows = client.execute(f"""
+                SELECT *
+                FROM atlas_driver_offer_bpp.image
+                WHERE person_id = '{driver_id}'AND image_type = '{document_type}' 
+                ORDER BY date DESC LIMIT 1;
+            """)
+            
+            # Convert rows to JSON format with field names
+            if rows:
+                row = rows[0]
+                json_data = {}
+                for i, col_name in enumerate(column_names):
+                    json_data[col_name] = row[i] if i < len(row) else None
+                return {"success": True, "data": json_data}
+            else:
+                return {"success": True, "data": None, "message": "No image found for this driver"}
+        except Exception as e:
+            logger.error(f"Error querying uploaded image: {str(e)}")
+            return {"success": False, "message": str(e)}
+    
+    def query_rc_activation_status(self, driver_id: str) -> Any:
+        client = self.get_client()
+        if client is None:
+            logger.warning("ClickHouse client is not available, returning empty results")
+            return {"success": False, "message": "ClickHouse client is not available"}
+        
+        if not driver_id:
+            logger.error("driver_id is required for ClickHouse query")
+            return {"success": False, "message": "driver_id is required"}
+        
+        try:
+            # Get column names first
+            columns_result = client.execute(f"""
+                SELECT name 
+                FROM system.columns 
+                WHERE database = 'atlas_driver_offer_bpp' 
+                AND table = 'driver_rc_association'
+                ORDER BY position;
+            """)
+            column_names = [col[0] for col in columns_result]
+            
+            # Get the data
+            rows = client.execute(f"""
+                SELECT *
+                FROM atlas_driver_offer_bpp.driver_rc_association
+                WHERE driver_id = '{driver_id}' ORDER BY date DESC LIMIT 1 ;
+            """)
+            
+            # Convert rows to JSON format with field names
+            if rows:
+                row = rows[0]
+                json_data = {}
+                for i, col_name in enumerate(column_names):
+                    json_data[col_name] = row[i] if i < len(row) else None
+                return {"success": True, "data": json_data}
+            else:
+                return {"success": True, "data": None, "message": "No RC activation status found for this driver"}
+        except Exception as e:
+            logger.error(f"Error querying RC activation status: {str(e)}")
+            return {"success": False, "message": str(e)}
+    
 # Global instance
 clickhouse_client = ClickHouseClient()
 

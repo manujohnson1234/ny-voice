@@ -60,7 +60,12 @@ class RC_DL_IssuesHandlers:
             await params.result_callback(error_result, properties=FunctionCallResultProperties(run_llm=True))
             return
 
-        result = await call_mcp_tool("get_doc_status", {"mobile_number": mobile_number})
+        document_type = params.arguments.get("document_type")
+
+        if not document_type and document_type not in ["DriverLicense", "VehicleRegistrationCertificate", "AadhaarCard", "VehicleInsurance"]: 
+            return params.result_callback({"success": False, "error": True, "message": "Document type is required"},properties=FunctionCallResultProperties(run_llm=True))
+
+        result = await call_mcp_tool("get_doc_status", {"mobile_number": mobile_number, "document_type": document_type})
 
         logger.info(f"result from get_doc_status: {result}")
         await params.result_callback(result, properties=FunctionCallResultProperties(run_llm=True))
