@@ -5,9 +5,15 @@ from pipecat.adapters.schemas.tools_schema import ToolsSchema
 
 get_doc_status = FunctionSchema(
     name = "get_doc_status",
-    description = "Get the status of the driver's documents (RC/DL)",
-    properties = {},
-    required = []
+    description = "Get the status of the driver's documents (DriverLicense, VehicleRegistrationCertificate, AadhaarCard, VehicleInsurance)",
+    properties = {
+        "document_type": {
+            "type": "string",
+            "description": "The type of document",
+            "enum": ["DriverLicense", "VehicleRegistrationCertificate", "AadhaarCard", "VehicleInsurance"]
+        }
+    },
+    required = ["document_type"]
 )
 
 bot_fail_to_resolve = FunctionSchema(

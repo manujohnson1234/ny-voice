@@ -64,14 +64,14 @@ def get_ride_details(ride_id: str, issue_type: str) -> Dict[str, Any]:
 
 
 
-def get_doc_status(mobile_number: str) -> Dict[str, Any]:
+def get_doc_status(mobile_number: str, document_type: str) -> Dict[str, Any]:
     """
     Get the status of the driver's documents (RC/DL).
     
     Args:
         mobile_number: Driver's mobile number
     """
-    return doc_status_service.get_doc_status(mobile_number)
+    return doc_status_service.get_doc_status(mobile_number, document_type)
 
 # Tool registry
 TOOLS = {

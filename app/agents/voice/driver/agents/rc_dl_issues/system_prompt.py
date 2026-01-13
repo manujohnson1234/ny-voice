@@ -42,6 +42,41 @@ DL_DOCUMENT = {
 }
 
 
+RCActiveOnOtherAccount = {
+    "ta": "உங்க ஆர்சி இன்னொரு டிரைவர்கூட ஆக்டிவேட் ஆகி இருக்கு.",
+    "kn": "ನಿಮ್ಮ ಆರ್‌ಸಿ ಇನ್ನೊಬ್ಬ ಡ್ರೈವರ್‌ನ ಅಕೌಂಟ್‌ನಲ್ಲಿ ಆಕ್ಟಿವ್ ಆಗಿದೆ.",
+    "hi": "आपकी आरसी किसी दूसरे ड्राइवर के अकाउंट पर एक्टिव है।",
+    "ml": "നിങ്ങളുടെ ആർസി മറ്റൊരു ഡ്രൈവറുടെ അക്കൗണ്ടിൽ ആക്ടീവ് ആണ്.",
+    "en": "Your RC is active on another driver account."
+}
+
+RCImageNotValid = {
+    "ta":"நீங்க அப்லோட் பண்ணுன ஆர்சி வேலிட் இல்ல. இன்னொரு முறை அப்லோட் செய்ய வேண்டும்.",
+    "kn": "ನೀವು ಅಪ್‌ಲೋಡ್ ಮಾಡಿದ ಆರ್‌ಸಿ ವ್ಯಾಲಿಡ್ ಇಲ್ಲ. ದಯವಿಟ್ಟು ಇನ್ನೊಮ್ಮೆ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.",
+    "hi": "आपने अपलोड किया हुआ आरसी वैलिड नहीं है। कृपया एक बार फिर से अपलोड कीजिए।",
+    "ml": "നിങ്ങൾ അപ്‌ലോഡ് ചെയ്ത ആർസി വാലിഡ് അല്ല. ദയവായി ഒരിക്കൽ കൂടി അപ്‌ലോഡ് ചെയ്യൂ.",
+    "en": "Your RC image is not valid. Please upload a valid image."
+}
+
+ImageDocumentNumberMismatch = {
+    "ta": "நீங்க அப்லோட் பண்ணிய இமேஜ்-ல இருக்குற ஆர்சி நம்பர், நீங்க கொடுத்த ஆர்சி நம்பர்-கூட மேட்ச் ஆகல.",
+    "kn": "ನೀವು ಅಪ್‌ಲೋಡ್ ಮಾಡಿದ ಇಮೇಜ್‌ನಲ್ಲಿ ಇರುವ ಆರ್‌ಸಿ ನಂಬರ್, ನೀವು ಕೊಟ್ಟ ಆರ್‌ಸಿ ನಂಬರ್‌ಗೆ ಮ್ಯಾಚ್ ಆಗುತ್ತಿಲ್ಲ.",
+    "hi": "आपने अपलोड की हुई इमेज में जो आरसी नंबर है, वो आपके दिए हुए आरसी नंबर से मैच नहीं हो रहा है।",
+    "ml": "നിങ്ങൾ അപ്‌ലോഡ് ചെയ്ത ഇമേജിൽ ഉള്ള ആർസി നമ്പർ, നിങ്ങൾ നൽകിയ ആർസി നമ്പറുമായി മാച്ച് ആവുന്നില്ല.",
+    "en": "The RC number in the image does not match with RC number you have provided."
+}
+
+
+RCInvalidAndTriesToActivate = {
+    "ta": "உங்கள இன்வாலிட் ஆர்சி-க்கு ஆக்டிவேட் அல்ல இனாக்டிவேட் ஒப்பரேஷன் பண்ண முடியாது.",
+    "kn": "ನಿಮ್ಮ ಇನ್‌ವ್ಯಾಲಿಡ್ ಆರ್‌ಸಿ‌ಗೆ ಆಕ್ಟಿವೇಟ್ ಅಥವಾ ಇನಾಕ್ಟಿವೇಟ್ ಆಪರೇಶನ್ ಮಾಡಲಾಗುವುದಿಲ್ಲ.",
+    "hi": "आपके इनवैलिड आरसी पर एक्टिवेट या इनएक्टिवेट ऑपरेशन नहीं किया जा सकता।",
+    "ml": "നിങ്ങളുടെ ഇൻവാലിഡ് ആർസി-യ്ക്ക് ആക്ടിവേറ്റ് അല്ലെങ്കിൽ ഇൻആക്ടിവേറ്റ് ഓപ്പറേഷൻ ചെയ്യാൻ കഴിയില്ല.",
+    "en": "You can't perform activate/inactivate operations on invalid RC!"
+
+}
+
+
 def get_rc_dl_issues_system_prompt(language: str = "ta"):
     """
     Generate the system prompt for the RC/DL issues agent.
@@ -57,6 +92,10 @@ def get_rc_dl_issues_system_prompt(language: str = "ta"):
     initial_move = INITIAL_MOVE.get(language, INITIAL_MOVE["ta"])
     rc_document = RC_DOCUMENT.get(language, RC_DOCUMENT["ta"])
     dl_document = DL_DOCUMENT.get(language, DL_DOCUMENT["ta"])
+    rc_active_on_other_account = RCActiveOnOtherAccount.get(language, RCActiveOnOtherAccount["ta"])
+    rc_image_not_valid = RCImageNotValid.get(language, RCImageNotValid["ta"])
+    image_document_number_mismatch = ImageDocumentNumberMismatch.get(language, ImageDocumentNumberMismatch["ta"])
+    rc_invalid_and_tries_to_activate = RCInvalidAndTriesToActivate.get(language, RCInvalidAndTriesToActivate["ta"])
     
     return [
         {
@@ -86,14 +125,22 @@ def get_rc_dl_issues_system_prompt(language: str = "ta"):
 
             STEP 2: HANDLE BASED ON ISSUE TYPE
 
-            **IF THE DRIVER CANNOT UPLOAD {rc_document} OR {dl_document}:**
+            **IF THE DRIVER CANNOT UPLOAD {rc_document} OR {dl_document} OR ANY OTHER DOCUMENT:**
             - Apologize to the driver for the inconvenience they are facing.
-            - Immediately use the bot_fail_to_resolve tool to escalate the call to the {support_team} team, as upload issues require manual intervention.
+            - Immediately use the bot_fail_to_resolve tool.
 
             **IF THE DRIVER CANNOT ACTIVATE {rc_document} OR {dl_document}:**
             - Apologize to the driver for the inconvenience they are facing.
-            - Call the get_doc_status tool to check the current status of their documents.
-            - Inform the driver about the status returned by the tool.
+            - Call the get_doc_status tool with the parameter document_type if facing issue in {rc_document} use document_type="VehicleRegistrationCertificate", if facing issue in {dl_document} use document_type="DriverLicense", if facing issue in AadhaarCard use document_type="AadhaarCard", if facing issue in VehicleInsurance use document_type="VehicleInsurance" to check the current status of their documents.
+              *Response for {rc_document} issue:
+                - If the parameter is_rc_active is true which means the driver has already activated the {rc_document} and the status is active, inform the driver that {rc_document} is already activated.
+                - If the {rc_document} is active on another driver account, inform the driver {rc_active_on_other_account} and ask further assistance reduired for clearing this issue.
+                - If the {rc_document} image is not valid, infom the driver {rc_image_not_valid}, ask further assistance reduired for clearing this issue.
+                - If the {rc_document} number mismatch, inform the driver {image_document_number_mismatch}, ask further assistance reduired for clearing this issue.
+                - If the {rc_document} is invalid and tries to perform the activation, inform the driver {rc_invalid_and_tries_to_activate}
+            
+                *Response for {dl_document} issue:
+                  - inform the driver about the status of the {dl_document} and ask further assistance reduired for clearing this issue.
 
             STEP 3: ASK FOR FURTHER ASSISTANCE
             After informing the document status, ask the driver if they need any further assistance.

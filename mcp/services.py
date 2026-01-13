@@ -1,4 +1,5 @@
 """Business logic services that orchestrate API calls and database queries."""
+import json
 from typing import Dict, Any, Optional
 from loguru import logger
 
@@ -279,6 +280,8 @@ class RideDetailsService:
             estimated_fare = ride_info.get('estimatedFare', None)
             actual_fare = ride_info.get('actualFare', None)
 
+            response = {"success": True}
+
             estimated_distance = ride_info.get('rideDistanceEstimated', None)
             actual_distance = ride_info.get('rideDistanceActual', None)
             
@@ -295,7 +298,10 @@ class RideDetailsService:
                 }
 
 
-            response = {"success": True}
+            if estimated_distance and actual_distance and estimated_distance != actual_distance:
+                response["estimated_distance"] = estimated_distance / 1000
+                response["actual_distance"] = actual_distance / 1000
+
 
 
             # Extract detailed fare breakdown
@@ -376,7 +382,8 @@ class DocStatusService:
         self.driver_info_client = DriverInfoClient()
         self.doc_status_client = DocStatusClient()
 
-    def get_doc_status(self, mobile_number: str) -> Dict[str, any]:
+    def get_doc_status(self, mobile_number: str, document_type: str) -> Dict[str, any]:
+        logger.info(f"Getting doc status for mobile_number: {mobile_number}")
 
         if not mobile_number or not mobile_number.isdigit():
             error_msg = "mobileNumber must be a valid numeric string."
@@ -404,17 +411,115 @@ class DocStatusService:
                 "error": "driverId not found in driver info response",
                 "driver_info": driver_info
             }
+
+        if APIConfig.ENVIRONMENT != "master":
+            uploaded_image = clickhouse_client.query_uploaded_image(driver_id, document_type)
+
+            logger.info(f"uploaded_image: {uploaded_image}")
+
+            if not uploaded_image.get("success"):
+                return uploaded_image
+
+            uploaded_image_data = uploaded_image.get("data", {})
+
+            
         
-        doc_status_response = self.doc_status_client.get_doc_status(driver_id)
-        if not doc_status_response.get("success"):
-            return doc_status_response
+            verification_status = uploaded_image_data.get('verification_status', None)
+            failure_reason = uploaded_image_data.get('failure_reason', None)
+            
+            # Extract tag from failure_reason if it's a JSON string
+            failure_tag = None
+            if failure_reason:
+                try:
+                    # Parse the JSON string to extract the tag
+                    if isinstance(failure_reason, str):
+                        failure_reason_dict = json.loads(failure_reason)
+                        failure_tag = failure_reason_dict.get('tag')
+                    elif isinstance(failure_reason, dict):
+                        failure_tag = failure_reason.get('tag')
+                except (json.JSONDecodeError, AttributeError) as e:
+                    logger.warning(f"Failed to parse failure_reason: {e}")
+                    failure_tag = None
+            
+            # if verification_status != "VALID" or failure_reason:
+            #     return{
+            #         "success": True,
+            #         "verification_status": verification_status,
+            #         "failure_reason": failure_tag if failure_tag else ""
+            #     }
+
+            rc_activation_status = clickhouse_client.query_rc_activation_status(driver_id)
+            if not rc_activation_status.get("success"):
+                return rc_activation_status
+
+            if rc_activation_status == None:
+                return {
+                    "success": True,
+                    "verification_status": verification_status,
+                    "failure_reason": failure_tag if failure_tag else ""
+                }
+
+
+
+            rc_activation_data = rc_activation_status.get("data", {})
+            logger.info(f"rc_activation_data: {rc_activation_data}")
+
+            created_date_for_image_table = uploaded_image_data.get('date', None)
+            create_date_for_rc_table = rc_activation_data.get('date', None) if isinstance(rc_activation_data, dict) else None
+
+            logger.info(f"created_date_for_image_table: {created_date_for_image_table}")
+            logger.info(f"create_date_for_rc_table: {create_date_for_rc_table}")
+            
+            if created_date_for_image_table and create_date_for_rc_table:
+                if created_date_for_image_table > create_date_for_rc_table:
+                    logger.info(f"Image table date is latest")
+                    if verification_status == "VALID" and failure_tag == None:
+                        return {
+                            "success": True,
+                            "verification_status": verification_status,
+                            "rc_is_active": True
+                        
+                        }
+                    else:
+                        return {
+                            "success": True,
+                            "verification_status": verification_status,
+                            "failure_reason": failure_tag if failure_tag else ""
+                        }
+
+                else:
+                    # rc_is_Active = rc_activation_data.get('is_rc_active', None)
+                    # errorMessage = rc_activation_data.get('errorMessage', None)
+
+                    rc_is_Active = False
+                    errorMessage = "You can't perform activate/inactivate operations on invalid RC!"
+
+                    if rc_is_Active:
+                        logger.info(f"RC is active")
+                        return {
+                            "success": True,
+                            "rc_is_Active": rc_is_Active
+                        }
+                    else:
+                        logger.info(f"RC is not active")
+                        return {
+                            "success": True,
+                            "errorMessage": errorMessage
+                        }
+            
+            
+        else:
         
-        doc_status = doc_status_response.get("data", {})
+            doc_status_response = self.doc_status_client.get_doc_status(driver_id)
+            if not doc_status_response.get("success"):
+                return doc_status_response
+            
+            doc_status = doc_status_response.get("data", {})
         
-        return {
-            "success": True,
-            "doc_status": doc_status
-        }
+            return {
+                "success": True,
+                "doc_status": doc_status
+            }
 
 
 

@@ -401,6 +401,7 @@ class DocStatusClient:
             #         "body": body
             #     }
             
+           
             return {
                 "success": True,
                 "data": "your RC is activated to another driver."
