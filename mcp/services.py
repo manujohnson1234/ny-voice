@@ -478,7 +478,6 @@ class DocStatusService:
                             "success": True,
                             "verification_status": verification_status,
                             "rc_is_active": True
-                        
                         }
                     else:
                         return {
@@ -488,24 +487,17 @@ class DocStatusService:
                         }
 
                 else:
-                    # rc_is_Active = rc_activation_data.get('is_rc_active', None)
-                    # errorMessage = rc_activation_data.get('errorMessage', None)
+                    rc_is_Active = rc_activation_data.get('is_rc_active', None)
+                    errorMessage = rc_activation_data.get('errorMessage', None)
 
-                    rc_is_Active = False
-                    errorMessage = "You can't perform activate/inactivate operations on invalid RC!"
+                    # rc_is_Active = #need to change. 
+                    # errorMessage = "You can't perform activate/inactivate operations on invalid RC!"
 
-                    if rc_is_Active:
-                        logger.info(f"RC is active")
-                        return {
-                            "success": True,
-                            "rc_is_Active": rc_is_Active
-                        }
-                    else:
-                        logger.info(f"RC is not active")
-                        return {
-                            "success": True,
-                            "errorMessage": errorMessage
-                        }
+                    return {
+                        "success": True,
+                        "rc_is_Active": rc_is_Active,
+                        "errorMessage": errorMessage
+                    }
             
             
         else:

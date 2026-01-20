@@ -22,3 +22,5 @@ class DriverParams(BaseModel):
     language_code: Optional[LanguageCode] = None
     agent_name: Optional[AgentName] = None
     ride_id: Optional[str] = None
+    room_url: Optional[str] = None
+    token: Optional[str] = None

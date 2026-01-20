@@ -78,4 +78,4 @@ KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9
 ENABLE_TRACING = os.environ.get("ENABLE_TRACING", "false").lower() == "true"
 LANGFUSE_BASE_URL = os.environ.get("LANGFUSE_BASE_URL", "")
 LANGFUSE_SECRET_KEY = os.environ.get("LANGFUSE_SECRET_KEY", "")
-LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY", "")
+LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY", "") 

@@ -8,10 +8,20 @@ from pydantic import BaseModel
 import redis
 import httpx
 import threading
+import aiohttp
 from loguru import logger
 
 import configs
 from kafka_logger import KafkaLogProducer
+
+
+from pipecat.transports.daily.utils import (
+    DailyMeetingTokenParams,
+    DailyMeetingTokenProperties,
+    DailyRESTHelper,
+    DailyRoomParams,
+    DailyRoomProperties,
+)
 
 REDIS_KEY_WARM_PODS = configs.REDIS_KEY_WARM_PODS
 REDIS_KEY_ACTIVE_PODS = configs.REDIS_KEY_ACTIVE_PODS
@@ -59,6 +69,8 @@ k8s = client.CoreV1Api()
 
 app = FastAPI(title="NY Voice Pod Manager")
 
+
+daily_rest = DailyRESTHelper(daily_api_key=configs.DAILY_API_KEY, daily_api_url=configs.DAILY_API_URL,aiohttp_session=aiohttp.ClientSession())
 
 
 class DriverParams(BaseModel):
@@ -331,6 +343,27 @@ async def assign_call(req: DriverParams):
         async_thread(ensure_idle_pool)
 
         try:
+            daily_room_properties = DailyRoomProperties(
+                exp=int(time.time() + configs.MAX_SESSION_TIME),
+                eject_at_room_exp=True,
+            )
+            room = await daily_rest.create_room(
+                params=DailyRoomParams(properties=daily_room_properties)
+            )
+            token_params = DailyMeetingTokenParams(
+                properties=DailyMeetingTokenProperties(
+                    eject_after_elapsed=configs.MAX_SESSION_TIME,
+                )
+            )
+
+            token = await daily_rest.get_token(
+                room.url,
+                expiry_time=configs.MAX_SESSION_TIME,
+                eject_at_token_exp=True,
+                owner=True,
+                params=token_params,
+            )
+
             async with httpx.AsyncClient(timeout=5) as client_http:
                 response = await client_http.post(
                     f"{pod_endpoint}/start-session",
@@ -340,7 +373,9 @@ async def assign_call(req: DriverParams):
                         "current_version_of_app": req.current_version_of_app,
                         "latest_version_of_app": req.latest_version_of_app,
                         "agent_name": req.agent_name,
-                        "ride_id": req.ride_id
+                        "ride_id": req.ride_id,
+                        "room_url": room.url,
+                        "token": token
                     }
                 )
                 response.raise_for_status()
@@ -349,7 +384,7 @@ async def assign_call(req: DriverParams):
                     "endpoint": pod_endpoint
                 }))
                 logger.bind(sessionId=pod_name, userId=req.phoneNumber).info(f"Registered active pod → {pod_name}")
-                return response.json()  
+                return {"room_url": room.url, "token": token} 
         except Exception as e:
             logger.bind(sessionId=pod_name, userId=req.phoneNumber).error(f"Pod {pod_name} failed to accept start-session: {e}")
             active_entry = json.dumps({

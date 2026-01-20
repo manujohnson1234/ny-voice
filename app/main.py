@@ -52,8 +52,10 @@ def _pod_endpoint() -> str | None:
         return f"http://{POD_IP}:{PORT}"
     return None
 
+daily_rest = None
 
-daily_rest = DailyRESTHelper(daily_api_key=DAILY_API_KEY, daily_api_url=DAILY_API_URL,aiohttp_session=aiohttp.ClientSession())
+if os.getenv("ENVIRONMENT") == "dev":
+    daily_rest = DailyRESTHelper(daily_api_key=DAILY_API_KEY, daily_api_url=DAILY_API_URL, aiohttp_session=aiohttp.ClientSession())
 
 
 # Create the FastAPI app instance
@@ -78,33 +80,38 @@ async def driver_voice_connect(request: DriverParams):
     latest_version_of_app = request.latest_version_of_app
     agent_name = request.agent_name
     ride_id = request.ride_id
+    room_url = request.room_url
+    token = request.token
 
 
     logger.info(f"Driver connected params: {agent_name}")
 
-   
-    daily_room_properties = DailyRoomProperties(
-        exp=time.time() + MAX_SESSION_TIME,
-        eject_at_room_exp=True,
-    )
-
-    room = await daily_rest.create_room(
-        params=DailyRoomParams(properties=daily_room_properties)
-    )
-
-    token_params = DailyMeetingTokenParams(
-        properties=DailyMeetingTokenProperties(
-            eject_after_elapsed=MAX_SESSION_TIME,
+    # Create room and token if not provided (or if not in dev mode)
+    if os.getenv("ENVIRONMENT") == "dev":
+        daily_room_properties = DailyRoomProperties(
+            exp=int(time.time() + MAX_SESSION_TIME),
+            eject_at_room_exp=True,
         )
-    )
 
-    token = await daily_rest.get_token(
-        room.url,
-        expiry_time=MAX_SESSION_TIME,
-        eject_at_token_exp=True,
-        owner=True,
-        params=token_params,
-    )
+        room = await daily_rest.create_room(
+            params=DailyRoomParams(properties=daily_room_properties)
+        )
+
+        room_url = room.url
+
+        token_params = DailyMeetingTokenParams(
+            properties=DailyMeetingTokenProperties(
+                eject_after_elapsed=MAX_SESSION_TIME,
+            )
+        )
+
+        token = await daily_rest.get_token(
+            room.url,
+            expiry_time=MAX_SESSION_TIME,
+            eject_at_token_exp=True,
+            owner=True,
+            params=token_params,
+        )
 
     session_id = str(uuid.uuid4()) 
 
@@ -116,7 +123,7 @@ async def driver_voice_connect(request: DriverParams):
     "python3",
     bot_file,
     "-u",
-    room.url,
+    room_url,
     "-t",
     token,
     "--session-id",
@@ -160,11 +167,15 @@ async def driver_voice_connect(request: DriverParams):
         bufsize=1,
     )
 
-    bot_procs[proc.pid] = (proc, room.url)
+    bot_procs[proc.pid] = (proc, room_url)
 
     logger.info(f"Voice agent started with PID: {proc.pid}")
-    
-    return {"room_url": room.url, "token": token}
+
+    if os.getenv("ENVIRONMENT") == "dev":
+        return {"room_url": room_url, "token": token}
+    else:
+        return {"status": "success"}
+
 
 async def register_with_router():
     endpoint = _pod_endpoint()
