@@ -71,20 +71,26 @@ app.add_middleware(
 )
 
 @app.post("/start-session")
-async def driver_voice_connect(request: DriverParams):
-    logger.info(f"Driver connected params: {request}")
+async def driver_voice_connect(request: DriverParams): # use this for dev env
+# async def driver_voice_connect():
+    # Get values from environment variables
 
-    driver_number = request.phoneNumber
-    language_code = request.language_code
-    current_version_of_app = request.current_version_of_app
-    latest_version_of_app = request.latest_version_of_app
-    agent_name = request.agent_name
-    ride_id = request.ride_id
-    room_url = request.room_url
-    token = request.token
+    language_code = None
+    room_url = None
+    token = None
+    agent_name = None
 
 
-    logger.info(f"Driver connected params: {agent_name}")
+    if os.getenv("ENVIRONMENT") == "dev":
+        language_code = request.language_code
+    else:
+        language_code = os.environ.get("LANGUAGE")
+        room_url = os.environ.get("ROOM_URL")
+        token = os.environ.get("TOKEN")
+        agent_name = os.environ.get("AGENT_NAME", "router")
+
+
+    logger.info(f"Driver connected params: language={language_code}, agent={agent_name}")
 
     # Create room and token if not provided (or if not in dev mode)
     if os.getenv("ENVIRONMENT") == "dev":
@@ -130,33 +136,16 @@ async def driver_voice_connect(request: DriverParams):
     session_id,
     ]
 
-    if driver_number:
-        cmd += ["--driver-number", driver_number]
 
     if language_code:
         cmd += ["--language-code", language_code]
     else:
         cmd += ["--language-code", "kn"]
     
-    if current_version_of_app:
-        cmd += ["--current-version-of-app", current_version_of_app]
-    else:
-        cmd += ["--current-version-of-app", ""]
-    
-    if latest_version_of_app:
-        cmd += ["--latest-version-of-app", latest_version_of_app]
-    else:
-        cmd += ["--latest-version-of-app", ""]
-    
     if agent_name:
         cmd += ["--agent-name", agent_name]
     else:
-        cmd += ["--agent-name", "not_getting_rides"]
-    
-    if ride_id:
-        cmd += ["--ride-id", ride_id]
-    else:
-        cmd += ["--ride-id", ""]
+        cmd += ["--agent-name", "router"]
         
 
     logger.info(f"Starting voice agent with command: {cmd}")
@@ -189,7 +178,9 @@ async def register_with_router():
             logger.info(f"[POD] Registering with endpoint {endpoint}")
             async with session.post(url, json={
                 "pod_name": POD_NAME,
-                "endpoint": endpoint
+                "endpoint": endpoint,
+                "room_url": os.environ.get("ROOM_URL"),
+                "token": os.environ.get("TOKEN")
             }) as response:
                 if response.status == 200:
                     logger.info(f"[POD] Successfully registered with router")
@@ -264,6 +255,7 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     if os.getenv("ENVIRONMENT") != "dev":
+        await driver_voice_connect()
         await register_with_router()
         asyncio.create_task(monitor_processes())
         logger.info("Started subprocess monitoring task")

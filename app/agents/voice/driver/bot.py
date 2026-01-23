@@ -123,25 +123,28 @@ async def save_audio_file(audio: bytes, filename: str, sample_rate: int, num_cha
 
 
 
-async def run_bot(room_url: str, token: str, session_id: str, driver_number: str, language_code: str, agent_name: str, current_version_of_app: Optional[str] = None, latest_version_of_app: Optional[str] = None, ride_id: Optional[str] = None):
+async def run_bot(room_url: str, token: str, session_id: str, language_code: str, agent_name: str):
     # Initialize session manager
+    driver_number = "8610263112"
+    current_version_of_app = ""
+    latest_version_of_app = ""
+    ride_id = None
+
+
     session_manager = get_session_manager()
     
     # Create session with initial data
     initial_data = {
-        "driver_number": driver_number,
+        "switch_count" : 0,
         "count_tool_calls": {}
     }
     
-    # Add ride_id if provided
-    if ride_id:
-        initial_data["ride_id"] = ride_id
     
     await session_manager.create_session(
         session_id=session_id,
         initial_data=initial_data
     )
-    logger.info(f"Session {session_id} initialized for driver {driver_number}")
+    logger.info(f"Session {session_id} initialized ")
 
     
     stt = get_stt_service(language=language_code) # for malayalam use sarvam 
@@ -155,10 +158,8 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     llms = AgentRouter(agents=agents, initial_agent=agent_name, session_id=session_id)
 
 
-    system_prompt = llms.get_current_context()  # Returns string (system prompt)
+    system_prompt = llms.get_current_context()  
     tools = llms.get_current_tools()
-    # Build proper messages list with system message
-    # llm_context = [{"role": "system", "content": system_prompt}]
     context = LLMContext(messages=system_prompt, tools=tools)
     context_aggregator = LLMContextAggregatorPair(context)
     
@@ -170,7 +171,6 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         vad_analyzer=SileroVADAnalyzer(params=VADParams(confidence=0.3,
         start_secs=0.2,
         stop_secs=0.7,)),
-        # vad_analyzer=None,
         turn_analyzer=LocalSmartTurnAnalyzerV3(),
     )
 
@@ -212,9 +212,9 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
             context_aggregator.assistant(),  # Assistant spoken responses
         ]
     )
-    ist_time = datetime.now(ZoneInfo("Asia/Kolkata"))
-    timestamp = ist_time.strftime("%Y-%m-%d_%H-%M-%S")
-    conversation_id = f"{driver_number}-{session_id}-{timestamp}"
+    # ist_time = datetime.now(ZoneInfo("Asia/Kolkata"))
+    # timestamp = ist_time.strftime("%Y-%m-%d_%H-%M-%S")
+    # conversation_id = f"{driver_number}-{session_id}-{timestamp}"
 
 
     task_params ={
@@ -223,9 +223,9 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         "observers": [RTVIObserver(rtvi)],
     }
 
-    if config.ENABLE_TRACING:
-        task_params["conversation_id"] = conversation_id
-        task_params["enable_tracing"] = True
+    # if config.ENABLE_TRACING:
+    #     task_params["conversation_id"] = conversation_id
+    #     task_params["enable_tracing"] = True
 
     task = PipelineTask(pipeline, **task_params)
 
@@ -259,18 +259,60 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         logger.info("Bot failed to resolve")
         sentence = await session_manager.get_value(session_id, "reason")
         message = get_bot_words(language=language_code, key=sentence)
-        logger.info(f"Bot words: {message}")
         await task.queue_frames([TTSSpeakFrame(message)])
         await task.queue_frames([RTVIServerMessageFrame(data={"event": "on_bot_fail_to_resolve"})])
         await session_manager.set_value(session_id, "end_call", "true")
 
+
+    @rtvi.event_handler("on_client_message")
+    async def on_client_message(rtvi, msg):
+        logger.info(f"RTVI client message - type: {msg.type}, data: {msg.data}")
+
+
+        if msg.type == "initial_data":
+            data = msg.data
+            phone_number = data.get("phone_number")
+            agent_name = data.get("agent_name")
+            ride_id = data.get("ride_id")
+            current_version_of_app = data.get("current_version_of_app")
+            latest_version_of_app = data.get("latest_version_of_app")
+            
+            if phone_number:
+                await session_manager.set_value(session_id, "driver_number", phone_number)
+            if ride_id:
+                await session_manager.set_value(session_id, "ride_id", ride_id)
+            if current_version_of_app:
+                await session_manager.set_value(session_id, "current_version_of_app", current_version_of_app)
+            if latest_version_of_app:
+                await session_manager.set_value(session_id, "latest_version_of_app", latest_version_of_app)
+
+            llm_context = llms.get_current_context()
+            llm_router_message = "when the driver has issue about their rides or fare, use the tool change_agent with the parameter agent_name='ride_related_issues' ."
+            
+            # Add llm_router_message to the beginning of the first message's content
+            if llm_context and len(llm_context) > 0 and "content" in llm_context[0]:
+                llm_context[0]["content"] = llm_router_message + "\n\n" + llm_context[0]["content"]
+            
+            first_message = f"switch to agent {agent_name}"
+            llm_context.append({"role": "system", "content": first_message})
+
+
+            await task.queue_frames([
+                LLMMessagesUpdateFrame(llm_context),
+                LLMRunFrame() 
+            ])
+            
+    @transport.event_handler("on_joined")
+    async def on_joined(transport, participant):
+        await task.queue_frame(FilterEnableFrame(True))
 
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         nonlocal timer_task
         logger.info("Client connected")
-        
+
+        await task.queue_frames([RTVIServerMessageFrame(data={"event": "bro_give_me_the_initial_data"})])
         # Update session with connection info
         await session_manager.set_value(session_id, "connected_at", datetime.now().isoformat())
         await session_manager.set_value(session_id, "status", "connected")
@@ -281,7 +323,6 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 
         await audiobuffer.start_recording()
     
-        await task.queue_frames([LLMRunFrame()])
 
         # Start 3-minute timer
         async def timer_function():
@@ -329,26 +370,35 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
         await task.cancel()
 
 
-    @transport.event_handler("on_joined")
-    async def on_joined(transport, participant):
-        await task.queue_frame(FilterEnableFrame(True))
+    
         
 
     @llms.event_handler("on_agent_switched")
     async def on_agent_switched(llms):
-        logger.info("Agent switched")
-        new_context = llms.get_current_context()  # This is a string (system prompt)
-        old_messages = context.get_messages()
+        new_context = llms.get_current_context() 
 
-        # Build proper messages list with system message first
+        current_agent_name = llms.get_current_agent_name()
 
-        for msg in reversed(old_messages):
-            if msg.get("role") == "user":
-                new_context.append({
-                    "role": "user",
-                    "content": msg.get("content", "")
-                })
-                break
+        if current_agent_name == "router":
+            llm_router_message = "when the driver has issue about their rides or fare. ask them to end the call and select the ride from the app which they have issue."
+            if llm_context and len(llm_context) > 0 and "content" in llm_context[0]:
+                llm_context[0]["content"] = llm_router_message + "\n\n" + llm_context[0]["content"]
+        
+
+
+        switch_count = await session_manager.get_value(session_id, "switch_count")
+        if switch_count >= 1:
+            old_messages = context.get_messages()
+            for msg in reversed(old_messages):
+                if msg.get("role") == "user":
+                    new_context.append({
+                        "role": "user",
+                        "content": msg.get("content", "")
+                    })
+                    break
+        switch_count = switch_count + 1
+        await session_manager.set_value(session_id, "switch_count", switch_count)
+
 
         await task.queue_frames([
             LLMMessagesUpdateFrame(new_context),
@@ -368,32 +418,32 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
     
 
     if config.ENABLE_TRACING:
-        langfuse_client = get_client()
-        tracer = trace.get_tracer(__name__)
-        with tracer.start_as_current_span(conversation_id) as root_span:
-            logger.info(
-                f"Starting current span with conversation ID: {conversation_id}"
-            )
-            root_span.set_attribute("driver_number", driver_number)
-            root_span.set_attribute("language_code", language_code)
-            root_span.set_attribute("current_version_of_app", current_version_of_app)
-            root_span.set_attribute("latest_version_of_app", latest_version_of_app)
-            root_span.set_attribute("session_id", session_id)
+        # langfuse_client = get_client()
+        # tracer = trace.get_tracer(__name__)
+        # with tracer.start_as_current_span(conversation_id) as root_span:
+        #     logger.info(
+        #         f"Starting current span with conversation ID: {conversation_id}"
+        #     )
+        #     root_span.set_attribute("driver_number", driver_number)
+        #     root_span.set_attribute("language_code", language_code)
+        #     root_span.set_attribute("current_version_of_app", current_version_of_app)
+        #     root_span.set_attribute("latest_version_of_app", latest_version_of_app)
+        #     root_span.set_attribute("session_id", session_id)
             
 
 
-            langfuse_client.update_current_trace(
-                user_id=driver_number,
-                session_id=session_id
-            )
+        #     langfuse_client.update_current_trace(
+        #         user_id=driver_number,
+        #         session_id=session_id
+        #     )
 
-            provider = ConversationContextProvider.get_instance()
-            provider.set_current_conversation_context(
-                root_span.get_span_context(), conversation_id
-            )
-            logger.info(
-                f"Set Pipecat conversation context with span ID: {root_span.get_span_context().span_id}"
-            )
+        #     provider = ConversationContextProvider.get_instance()
+        #     provider.set_current_conversation_context(
+        #         root_span.get_span_context(), conversation_id
+        #     )
+        #     logger.info(
+        #         f"Set Pipecat conversation context with span ID: {root_span.get_span_context().span_id}"
+        #     )
             await run_pipeline()
     else:
         await run_pipeline()
@@ -401,21 +451,19 @@ async def run_bot(room_url: str, token: str, session_id: str, driver_number: str
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-u", "--url", type=str, required=True, help="URL of the livekit room"
+        "-u", "--url", type=str, required=True, help="URL of the daily room"
     )
-    parser.add_argument("-t", "--token", type=str, required=True, help="Livekit token")
+    parser.add_argument("-t", "--token", type=str, required=True, help="daily token")
     parser.add_argument(
         "--session-id", type=str, required=True, help="Session ID for logging"
     )
-    parser.add_argument("--driver-number", type=str, required=True, help="Driver number")
+
     parser.add_argument("--language-code", type=str, required=True, help="Language code")
-    parser.add_argument("--current-version-of-app", type=str, required=True, help="Current version of app")
-    parser.add_argument("--latest-version-of-app", type=str, required=True, help="Latest version of app")
+
     parser.add_argument("--agent-name", type=str, required=True, help="Agent name")
-    parser.add_argument("--ride-id", type=str, required=False, help="Ride ID")
 
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
-    asyncio.run(run_bot(args.url, args.token, args.session_id, args.driver_number, args.language_code, args.agent_name, args.current_version_of_app, args.latest_version_of_app, args.ride_id))
+    asyncio.run(run_bot(args.url, args.token, args.session_id, args.language_code, args.agent_name))

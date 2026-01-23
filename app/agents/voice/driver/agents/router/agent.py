@@ -131,6 +131,8 @@ class AgentRouter(LLMSwitcher):
                     if isinstance(processor, ServiceSwitcher.ServiceSwitcherFilter):
                         processor._active_service = target_llm
 
+    def get_current_agent_name(self) -> str:
+        return self.current_agent
 
     def get_system_prompt(self) -> str:
         return get_agent_system_prompt(language=self.language)

@@ -85,6 +85,8 @@ class DriverParams(BaseModel):
 class RegisterReq(BaseModel):
     pod_name: str
     endpoint: str
+    room_url: Optional[str] = None
+    token: Optional[str] = None
 
 class EndReq(BaseModel):
     pod_name: str
@@ -97,8 +99,53 @@ def async_thread(fn):
     t = threading.Thread(target=fn, daemon=True)
     t.start()
 
+def async_thread_async(coro):
+    """Runs an async function in a separate thread non-blocking."""
+    import asyncio
+    def run_async():
+        asyncio.run(coro)
+    t = threading.Thread(target=run_async, daemon=True)
+    t.start()
 
 
+async def create_pod_with_room_token(language: str):
+    """Create room and token, then create pod."""
+    try:
+        # Create a new aiohttp session within this async context
+        # This ensures it's bound to the correct event loop created by asyncio.run()
+        async with aiohttp.ClientSession() as session:
+            # Create a new DailyRESTHelper instance with the session for this call
+            daily_rest_instance = DailyRESTHelper(
+                daily_api_key=configs.DAILY_API_KEY,
+                daily_api_url=configs.DAILY_API_URL,
+                aiohttp_session=session
+            )
+            
+            daily_room_properties = DailyRoomProperties(
+                exp=int(time.time() + configs.MAX_SESSION_TIME),
+                eject_at_room_exp=True,
+            )
+            room = await daily_rest_instance.create_room(
+                params=DailyRoomParams(properties=daily_room_properties)
+            )
+            token_params = DailyMeetingTokenParams(
+                properties=DailyMeetingTokenProperties(
+                    eject_after_elapsed=configs.MAX_SESSION_TIME,
+                )
+            )
+
+            token = await daily_rest_instance.get_token(
+                room.url,
+                expiry_time=configs.MAX_SESSION_TIME,
+                eject_at_token_exp=True,
+                owner=True,
+                params=token_params,
+            )
+            
+            # Create pod with room_url and token
+            create_pod(language=language, room_url=room.url, token=token)
+    except Exception as e:
+        logger.error(f"Error creating pod with room/token for language {language}: {e}")
 
 
 def ensure_idle_pool():
@@ -114,23 +161,37 @@ def ensure_idle_pool():
         return
     
     try:
-        active_count = redis_client.llen(REDIS_KEY_ACTIVE_PODS) 
-        idle_count = redis_client.llen(REDIS_KEY_WARM_PODS)
+        # Define languages to check
+        languages = ["ta", "hi", "kn", "ml", "en"]
+        
+        for language in languages:
+            redis_key = f"{REDIS_KEY_WARM_PODS}-{language}"
+            idle_count = redis_client.llen(redis_key)
+            
+            if idle_count < MIN_IDLE:
+                to_create = MIN_IDLE - idle_count
+                if to_create > 0:
+                    logger.debug(f"Ensuring warm pool for {language}: {idle_count} idle, creating {to_create} pods")
+                    for _ in range(to_create):
+                        # Use async function to create room/token and then create pod
+                        async_thread_async(create_pod_with_room_token(language))
+                else:
+                    logger.debug(f"Warm pool sufficient for {language}: {idle_count} idle pods")
 
-        total_pods = active_count + idle_count
 
-        if total_pods >= MAX_POD:
-            logger.info(f"Max pods reached: {total_pods} active pods")
-            return
 
-        to_create = MIN_IDLE - idle_count
+        # if total_pods >= MAX_POD:
+        #     logger.info(f"Max pods reached: {total_pods} active pods")
+        #     return
 
-        if to_create > 0:
-            logger.debug(f"Ensuring warm pool: {idle_count} idle, creating {to_create} pods")
-            for _ in range(to_create):
-                async_thread(create_pod)
-        else:
-            logger.debug(f"Warm pool sufficient: {idle_count} idle pods")
+        # to_create = MIN_IDLE - idle_count
+
+        # if to_create > 0:
+        #     logger.debug(f"Ensuring warm pool: {idle_count} idle, creating {to_create} pods")
+        #     for _ in range(to_create):
+        #         async_thread(create_pod)
+        # else:
+        #     logger.debug(f"Warm pool sufficient: {idle_count} idle pods")
     except (redis.ConnectionError, redis.TimeoutError) as e:
         logger.warning(f"Redis connection issue during pool check: {e}")
     except Exception as e:
@@ -155,7 +216,7 @@ def delete_pod(name: str, active_entry: str):
 
 
 
-def create_pod():
+def create_pod(language: str, room_url: str, token: str):
     """Create a pod (raw pod) asynchronously."""
     try:
         pod_id = redis_client.incr("ny-voice-next-pod")
@@ -168,7 +229,7 @@ def create_pod():
         logger.error(f"Redis error when creating pod: {e}")
         pod_id = int(time.time() * 1000) % 1000000
     
-    name = f"pipecat-agent-{pod_id}"
+    name = f"pipecat-agent-{pod_id}-{language}"
 
     pod = client.V1Pod(
         metadata=client.V1ObjectMeta(
@@ -186,6 +247,9 @@ def create_pod():
                     image=configs.IMAGE,
                     image_pull_policy="Always",
                     env=[
+                        client.V1EnvVar(name="ROOM_URL", value=room_url),
+                        client.V1EnvVar(name="TOKEN", value=token),
+                        client.V1EnvVar(name="LANGUAGE", value=language),
                         client.V1EnvVar(name="PORT", value=str(configs.PORT)),
                         client.V1EnvVar(name="HOST", value=configs.HOST),
                         client.V1EnvVar(name="UVICORN_RELOAD", value=str(configs.UVICORN_RELOAD).lower()),
@@ -272,13 +336,38 @@ def watch_pipecat_pods():
                 pod_ip = pod.status.pod_ip
 
                 if typ == "DELETED":
-                    logger.bind(sessionId=name).warning(f"[WATCH] Pod deleted → {name}")
-                    to_be_deleted = json.dumps({
-                        "pod_name": name,
-                        "endpoint": f"http://{pod_ip}:8080"
-                    })
+                    # Extract language from pod name (format: pipecat-agent-{pod_id}-{language})
+                    language = None
+                    if name and name.startswith("pipecat-agent-"):
+                        parts = name.split("-")
+                        if len(parts) >= 4: 
+                            language = parts[-1] 
+
+                    logger.bind(sessionId=name).warning(f"[WATCH] Pod deleted → {name} (language: {language})")
+
                     try:
-                        redis_client.lrem(REDIS_KEY_WARM_PODS, 0, to_be_deleted)
+                        # Use language-specific Redis key
+                        if language:
+                            redis_key = f"{REDIS_KEY_WARM_PODS}-{language}"
+                        else:
+                            redis_key = REDIS_KEY_WARM_PODS
+                        
+                        # Get all entries from the language-specific list
+                        all_pods = redis_client.lrange(redis_key, 0, -1)
+                        
+                        # Find and remove the entry with matching pod_name
+                        for pod_entry in all_pods:
+                            try:
+                                pod_data = json.loads(pod_entry)
+                                if pod_data.get("pod_name") == name:
+                                    # Remove this specific entry
+                                    redis_client.lrem(redis_key, 0, pod_entry)
+                                    logger.bind(sessionId=name).info(f"[WATCH] Removed pod from {redis_key}: {name}")
+                                    break
+                            except (json.JSONDecodeError, KeyError) as e:
+                                logger.bind(sessionId=name).warning(f"Error parsing pod entry: {e}")
+                                continue
+                        
                         async_thread(ensure_idle_pool)
                         logger.bind(sessionId=name).info(f"[WATCH] Pod deleted → {name}")
                     except Exception as e:
@@ -291,27 +380,28 @@ def watch_pipecat_pods():
             continue
             
 
-def maintain_warm_pods():
-    while True:
-        try:
-            idle_count = redis_client.llen(REDIS_KEY_WARM_PODS)
-            if idle_count > MIN_IDLE:
-                excess = idle_count - MIN_IDLE
-                for _ in range(excess):
-                    pod = redis_client.rpop(REDIS_KEY_WARM_PODS)
-                    if pod:
-                        pod_info = json.loads(pod)
-                        delete_pod(pod_info["pod_name"], pod)
-        except Exception as e:
-            logger.error(f"Error maintaining warm pods: {e}")
-        time.sleep(300)  
+# def maintain_warm_pods():
+#     while True:
+#         try:
+#             idle_count = redis_client.llen(REDIS_KEY_WARM_PODS)
+#             if idle_count > MIN_IDLE:
+#                 excess = idle_count - MIN_IDLE
+#                 for _ in range(excess):
+#                     pod = redis_client.rpop(REDIS_KEY_WARM_PODS)
+#                     if pod:
+#                         pod_info = json.loads(pod)
+#                         delete_pod(pod_info["pod_name"], pod)
+#         except Exception as e:
+#             logger.error(f"Error maintaining warm pods: {e}")
+#         time.sleep(300)  
 
 
 @app.post("/driver/voice/connect")
 async def assign_call(req: DriverParams):
+    language_code = req.language_code
     while True:
         try:
-            pod = redis_client.lpop(REDIS_KEY_WARM_PODS)
+            pod = redis_client.lpop(f"{REDIS_KEY_WARM_PODS}-{language_code}")
         except (redis.ConnectionError, redis.TimeoutError) as e:
             logger.error(f"Redis connection error when assigning call: {e}")
             raise HTTPException(status_code=503, detail="Redis unavailable. Service temporarily unavailable.")
@@ -326,6 +416,8 @@ async def assign_call(req: DriverParams):
         pod_info = json.loads(pod)
         pod_endpoint = pod_info["endpoint"]
         pod_name = pod_info["pod_name"]
+        room_url = pod_info["room_url"]
+        token = pod_info["token"]
 
         # Check if pod exists in Kubernetes before making HTTP request
         try:
@@ -343,48 +435,48 @@ async def assign_call(req: DriverParams):
         async_thread(ensure_idle_pool)
 
         try:
-            daily_room_properties = DailyRoomProperties(
-                exp=int(time.time() + configs.MAX_SESSION_TIME),
-                eject_at_room_exp=True,
-            )
-            room = await daily_rest.create_room(
-                params=DailyRoomParams(properties=daily_room_properties)
-            )
-            token_params = DailyMeetingTokenParams(
-                properties=DailyMeetingTokenProperties(
-                    eject_after_elapsed=configs.MAX_SESSION_TIME,
-                )
-            )
+            # daily_room_properties = DailyRoomProperties(
+            #     exp=int(time.time() + configs.MAX_SESSION_TIME),
+            #     eject_at_room_exp=True,
+            # )
+            # room = await daily_rest.create_room(
+            #     params=DailyRoomParams(properties=daily_room_properties)
+            # )
+            # token_params = DailyMeetingTokenParams(
+            #     properties=DailyMeetingTokenProperties(
+            #         eject_after_elapsed=configs.MAX_SESSION_TIME,
+            #     )
+            # )
 
-            token = await daily_rest.get_token(
-                room.url,
-                expiry_time=configs.MAX_SESSION_TIME,
-                eject_at_token_exp=True,
-                owner=True,
-                params=token_params,
-            )
+            # token = await daily_rest.get_token(
+            #     room.url,
+            #     expiry_time=configs.MAX_SESSION_TIME,
+            #     eject_at_token_exp=True,
+            #     owner=True,
+            #     params=token_params,
+            # )
 
-            async with httpx.AsyncClient(timeout=5) as client_http:
-                response = await client_http.post(
-                    f"{pod_endpoint}/start-session",
-                    json={
-                        "phoneNumber": req.phoneNumber,
-                        "language_code": req.language_code,
-                        "current_version_of_app": req.current_version_of_app,
-                        "latest_version_of_app": req.latest_version_of_app,
-                        "agent_name": req.agent_name,
-                        "ride_id": req.ride_id,
-                        "room_url": room.url,
-                        "token": token
-                    }
-                )
-                response.raise_for_status()
-                redis_client.rpush(REDIS_KEY_ACTIVE_PODS, json.dumps({
-                    "pod_name": pod_name,
-                    "endpoint": pod_endpoint
-                }))
-                logger.bind(sessionId=pod_name, userId=req.phoneNumber).info(f"Registered active pod → {pod_name}")
-                return {"room_url": room.url, "token": token} 
+            # async with httpx.AsyncClient(timeout=5) as client_http:
+            #     response = await client_http.post(
+            #         f"{pod_endpoint}/start-session",
+            #         json={
+            #             "phoneNumber": req.phoneNumber,
+            #             "language_code": req.language_code,
+            #             "current_version_of_app": req.current_version_of_app,
+            #             "latest_version_of_app": req.latest_version_of_app,
+            #             "agent_name": req.agent_name,
+            #             "ride_id": req.ride_id,
+            #             "room_url": room.url,
+            #             "token": token
+            #         }
+            #     )
+            #     response.raise_for_status()
+            redis_client.rpush(REDIS_KEY_ACTIVE_PODS, json.dumps({
+                "pod_name": pod_name,
+                "endpoint": pod_endpoint
+            }))
+            logger.bind(sessionId=pod_name, userId=req.phoneNumber).info(f"Registered active pod → {pod_name}")
+            return {"room_url": room_url, "token": token} 
         except Exception as e:
             logger.bind(sessionId=pod_name, userId=req.phoneNumber).error(f"Pod {pod_name} failed to accept start-session: {e}")
             active_entry = json.dumps({
@@ -397,17 +489,48 @@ async def assign_call(req: DriverParams):
 
 
 @app.post("/register")
-def register_pod(req: RegisterReq):
+async def register_pod(req: RegisterReq):
     """Pod calls this when it starts."""
+    
+    # Extract language from pod name (format: pipecat-agent-{pod_id}-{language})
+    language = None
+    if req.pod_name and req.pod_name.startswith("pipecat-agent-"):
+        parts = req.pod_name.split("-")
+        if len(parts) >= 4: 
+            language = parts[-1] 
+    
+    logger.info(f"language: {language}")
+
+    # async with httpx.AsyncClient(timeout=5) as client_http:
+    #     response = await client_http.post(
+    #         f"{req.endpoint}/start-session",
+    #         json={
+    #             "language_code": language,
+    #             "room_url": room.url,
+    #             "token": token,
+    #         }
+    #     )
+    #     response.raise_for_status() 
+
+
     try:
-        redis_client.rpush(REDIS_KEY_WARM_PODS, json.dumps({
+        # Use dynamic Redis key based on language
+        if language:
+            redis_key = f"{REDIS_KEY_WARM_PODS}-{language}"
+        else:
+            redis_key = REDIS_KEY_WARM_PODS  # Fallback to base key if language not found
+        
+        redis_client.rpush(redis_key, json.dumps({
             "pod_name": req.pod_name,
-            "endpoint": req.endpoint
+            "endpoint": req.endpoint,
+            "room_url": req.room_url,
+            "token": req.token,
         }))
-        logger.bind(sessionId=req.pod_name).info(f"Registered warm pod → {req.pod_name}")
+
+        logger.bind(sessionId=req.pod_name).info(f"Registered warm pod → {req.pod_name} (language: {language}, redis_key: {redis_key})")
     except (redis.ConnectionError, redis.TimeoutError) as e:
         logger.bind(sessionId=req.pod_name).error(f"Redis connection error when registering pod: {e}")
-        return {"status": "registered", "warning": "Redis unavailable, registration may not persist"}
+        return {"status": "registered", "warning": "Redis unavailable, registration may not "}
     except Exception as e:
         logger.bind(sessionId=req.pod_name).error(f"Redis error when registering pod: {e}")
         return {"status": "registered", "warning": "Redis error, registration may not persist"}
@@ -434,10 +557,55 @@ async def health_check():
     return {"status": "healthy"}
 
 
-@app.on_event("startup")
-def startup_event():
-    logger.debug("Starting up... ensuring warm pool")
+@app.get("/ready")
+async def readiness_check():
+    """Readiness check endpoint - returns 200 only when pod manager is ready."""
+    if check_pod_manager_ready():
+        return {"status": "ready"}
+    else:
+        raise HTTPException(status_code=503, detail="Pod manager not ready")
+
+
+def check_pod_manager_ready():
+    """Check if pod manager is ready to accept requests."""
+    try:
+        # Check Redis connection
+        redis_client.ping()
+        
+        # Check Kubernetes API connection
+        k8s.list_namespaced_pod(namespace=NAMESPACE, limit=1)
+        
+        return True
+    except Exception as e:
+        logger.debug(f"Pod manager not ready yet: {e}")
+        return False
+
+
+def wait_for_readiness():
+    """Wait until pod manager is ready, then start background tasks."""
+    max_retries = 60  # Wait up to 5 minutes (60 * 5 seconds)
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        if check_pod_manager_ready():
+            logger.info("Pod manager is ready. Starting background tasks...")
+            async_thread(ensure_idle_pool)
+            async_thread(watch_pipecat_pods)
+            return
+        
+        retry_count += 1
+        logger.debug(f"Waiting for pod manager to be ready... (attempt {retry_count}/{max_retries})")
+        time.sleep(5)  # Wait 5 seconds between checks
+    
+    logger.error("Pod manager failed to become ready after maximum retries. Starting background tasks anyway...")
+    # Start anyway after max retries to avoid complete failure
     async_thread(ensure_idle_pool)
     async_thread(watch_pipecat_pods)
-    async_thread(maintain_warm_pods)
+
+
+@app.on_event("startup")
+def startup_event():
+    logger.debug("Starting up... waiting for pod manager to be ready")
+    async_thread(wait_for_readiness)
+    # async_thread(maintain_warm_pods)
 
