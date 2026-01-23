@@ -16,11 +16,7 @@ class AgentName(str, Enum):
     RC_DL_ISSUES = "rc_dl_issues"
 
 class DriverParams(BaseModel):
-    phoneNumber: str
-    current_version_of_app: Optional[str] = None
-    latest_version_of_app: Optional[str] = None
     language_code: Optional[LanguageCode] = None
     agent_name: Optional[AgentName] = None
-    ride_id: Optional[str] = None
     room_url: Optional[str] = None
     token: Optional[str] = None

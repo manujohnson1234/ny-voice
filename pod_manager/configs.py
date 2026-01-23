@@ -57,7 +57,16 @@ MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
 
 
 REDIS_KEY_WARM_PODS = os.environ.get("REDIS_KEY_WARM_PODS", "ny-voice-warm-pods")
+
+REDIS_KEY_WARM_PODS_TAMIL = os.environ.get("REDIS_KEY_WARM_PODS_TAMIL", "ny-voice-warm-pods-ta")
+REDIS_KEY_WARM_PODS_HINDI = os.environ.get("REDIS_KEY_WARM_PODS_HINDI", "ny-voice-warm-pods-hi")
+REDIS_KEY_WARM_PODS_KANNADA = os.environ.get("REDIS_KEY_WARM_PODS_KANNADA", "ny-voice-warm-pods-kn")
+REDIS_KEY_WARM_PODS_MALAYALAM = os.environ.get("REDIS_KEY_WARM_PODS_MALAYALAM", "ny-voice-warm-pods-ml")
+REDIS_KEY_WARM_PODS_ENGLISH = os.environ.get("REDIS_KEY_WARM_PODS_ENGLISH", "ny-voice-warm-pods-en")
+
 REDIS_KEY_ACTIVE_PODS = os.environ.get("REDIS_KEY_ACTIVE_PODS", "ny-voice-active-pods")
+
+
 NAMESPACE = os.environ.get("NAMESPACE", "ny-voicebot")
 IMAGE = os.environ.get("IMAGE", "")
 MIN_IDLE = int(os.environ.get("MIN_IDLE", "3"))

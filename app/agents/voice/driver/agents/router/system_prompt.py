@@ -32,8 +32,6 @@ def get_agent_system_prompt(language: str = "ta"):
                 - not_getting_rides
                 - ride_related_issues
                 - rc_dl_issues
-
-                when the driver has issue about their rides or fare. ask them to end the call and select the ride from the app which they have issue.
                 
                 when the driver has issue about not getting ride use the tool change_agent with the parameter agent_name='not_getting_rides' to route the conversation to the not_getting_rides agent.
 

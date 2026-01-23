@@ -6,3 +6,5 @@ uvicorn[standard]==0.29.0
 python-dotenv>=1.0.0
 loguru>=0.7.0
 kafka-python
+pipecat-ai[daily]
+aiohttp>=3.9.0
