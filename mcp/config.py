@@ -18,6 +18,7 @@ class APIConfig:
     OVERLAY_API_URL = "https://dashboard.beckn.juspay.in/api/bpp/driver-offer/NAMMA_YATRI_PARTNER/driver/{}/sendSms"
     RIDE_DETAILS_FARE_BREAKUP_URL = "https://dashboard.beckn.juspay.in/api/bpp/driver-offer/NAMMA_YATRI_PARTNER/Bangalore/ride/{}/fareBreakUp"
     RIDE_DETAILS_INFO_URL = "https://dashboard.beckn.juspay.in/api/bpp/driver-offer/NAMMA_YATRI_PARTNER/Bangalore/ride/{}/info"
+    # COINS_HISTORY_URL = "https://api.beckn.juspay.in/dashboard/NAMMA_YATRI/Bangalore/coins/coinHistory/{}"
 
     
     # API Keys

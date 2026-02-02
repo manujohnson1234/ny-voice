@@ -48,7 +48,7 @@ ENABLE_S3_STORAGE = os.environ.get("ENABLE_S3_STORAGE", "false").lower() == "tru
 ENABLE_LOCAL_STORAGE = os.environ.get("ENABLE_LOCAL_STORAGE", "false").lower() == "true"
 
 
-MAX_SESSION_TIME = 5 * 60  # seconds or whatever you want
+MAX_SESSION_TIME = 60 * 60  # seconds (1 hour)
 
 
 ROUTER_URL = os.environ.get("ROUTER_URL", "http://router:8082")

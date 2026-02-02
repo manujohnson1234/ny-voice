@@ -9,7 +9,7 @@ get_ride_details = FunctionSchema(
         "issue": {
             "type": "string",
             "description": "The issue with the ride",
-            "enum": ["TOLL_CHARGES", "FARE"]
+            "enum": ["TOLL_CHARGES", "FARE", "CANCELLATION"]
         }
     },
     required = ["issue"]
