@@ -27,7 +27,7 @@ TROUBLESHOOTING_ITEMS = {
     ],
     "kn": [
         "ಇಂಟರ್ನೆಟ್ ಕನೆಕ್ಷನ್",
-        "ಲೇಟೆಸ್ಟ್ ಆಪ್ ವರ್ಚನ್",
+        "ನಮ್ಮ ಯಾತ್ರಿ ಲೇಟೆಸ್ಟ್ ಆಪ್ ವರ್ಚನ್",
         "ಲೊಕೇಷನ್ ಮತ್ತು ನೋಟಿಫಿಕೇಶನ್ ಅನುಮತಿ"
     ],
     "hi": [
@@ -57,11 +57,27 @@ SUPPORT_TEAM = {
 
 INITIAL_MOVE = {
     "ta" : "வணக்கம்! நீங்க என்ன issue ஃபேஸ் பண்ணுறீங்கன்னு சொல்லுங்க, நான் ஹெல்ப் பண்ணுறேன்.",
-    "kn": "ನಮಸ್ಕಾರ! ನೀವು ಯಾವ ಇಶ್ಯೂ ಫೇಸ್ ಮಾಡ್ತಿದ್ದೀರೋ ಹೇಳಿ, ನಾನು ಹೆಲ್ಪ್ ಮಾಡ್ತೇನೆ.",
+    "kn": "ನೀವು ರೈಡ್ಸ್ ಪಡೆಯುತ್ತಿಲ್ಲವೆಂದು ನಾನು ಅರ್ಥಮಾಡಿಕೊಂಡಿದ್ದೇನೆ. ನೀವು ಎಷ್ಟು ಸಮಯದಿಂದ ರೈಡ್ಸ್ ಪಡೆಯುತ್ತಿಲ್ಲ ಎಂದು ದಯವಿಟ್ಟು ತಿಳಿಸಬಹುದೇ?",
     "hi": "नमस्ते! आप कौन-सा इश्यू फेस कर रहे हैं, बता दीजिए, मैं हेल्प करूँगी।",
     "ml": "നമസ്കാരം! നിങ്ങൾ ഏത് ഇഷ്യൂ ഫേസ് ചെയ്യുന്നു എന്ന് പറയൂ, ഞാൻ ഹെൽപ് ചെയ്യും.",
     "en": "Hello! Please tell me what issue you are facing, and I will help you."
 
+}
+
+CHECK_FOR_BANGLORE = {
+    "ta": "",
+    "kn": "ಚಾಲಕ ನಿಮ್ಮ ಲೊಕೇಷನ್ ಬೆಂಗಳೂರುದಲ್ಲಿದೆಯೇ?",
+    "hi": "",
+    "ml": "",
+    "en": "",
+}
+
+RARE_PHONE_NUMBER_CALL = {
+    "ta": "உங்க நம்பர் கொடுக்க தேவையில்லை, நீங்க சந்திக்கிற பிரச்சனையை மட்டும் சொல்லுங்க.",
+    "kn": "ಚಾಲಕ, ನಿಮ್ಮ ನಂಬರ್ ನೀಡಬೇಕಾಗಿಲ್ಲ, ನೀವು ಎದುರಿಸುತ್ತಿರುವ ಸಮಸ್ಯೆಯನ್ನು ಮಾತ್ರ ಹೇಳಿ.",
+    "hi": "अपना नंबर देने की जरूरत नहीं है, आप जो समस्या झेल रहे हैं वो बस बताइए।",
+    "ml": "",
+    "en": "",
 }
 
 def get_not_getting_rides_system_prompt(language: str = "ta"):
@@ -79,13 +95,14 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
     troubleshooting_items = TROUBLESHOOTING_ITEMS.get(language, TROUBLESHOOTING_ITEMS["ta"])
     support_team = SUPPORT_TEAM.get(language, SUPPORT_TEAM["ta"])
     troubleshooting_list = " ".join(troubleshooting_items)
-    
+    check_for_bangalore = CHECK_FOR_BANGLORE.get(language, CHECK_FOR_BANGLORE["ta"])
+    rare_phone_number_call = RARE_PHONE_NUMBER_CALL.get(language, RARE_PHONE_NUMBER_CALL["ta"])
     return [
         {
             "role": "system",
             "content": f"""
             
-            You are a Nammayatri support agent specifically designed to help drivers.
+            You are a {support_team} support agent specifically designed to help drivers.
             Be empathetic, helpful, and professional when dealing with driver concerns.
 
             Always keep the following product terms in English, even if you respond in another language: "app", "test notification", "search request", "block", "dues", "online", "offline", "nearby search request", "ten minutes", "two hours", "locations", "sorry", "minute", "hour", all the numbers in English.
@@ -105,7 +122,7 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
 
 
             STEP 1: ASK ABOUT THE ISSUE
-            "{initial_move}" 
+            * start with "{initial_move}" 
         
             STEP 2: GET COMPREHENSIVE DRIVER INFORMATION
             Apoligies to the driver for the inconvenience
@@ -122,8 +139,8 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
             STEP 3: INFORM DRIVER ABOUT THEIR STATUS
             Based on the get_driver_info response, tell the driver:
             * If the Blocked status is  true :
-                * inform the driver that their account is blocked and tell them the response which is provided in blockedReason field.
-                * if the driver wants help to unblock their account, use bot_fail_to_resolve tool to escalate the call to Namma Yatri team. 
+                * inform the driver that their account is blocked.
+                * if the driver wants help to unblock their account, use bot_fail_to_resolve. 
             * If the Due amount is there for the driver: 
                 * inform the driver that they have due amount and they need to pay the due amount (which is provided in the parameter currentDues) to go online.
                 * use send_overlay_sms tool to send the overlay SMS to the driver for dues payment if the driver wants to pay the due amount.
@@ -140,20 +157,25 @@ def get_not_getting_rides_system_prompt(language: str = "ta"):
             STEP 5: CONFIRM NOTIFICATION RECEIPT (if notification was sent)
             If you sent a test notification, ask the driver: "Did you receive the 'test notification' I just sent?"
 
-            STEP 6: HOTSPOT FEATURE GUIDANCE (if notification received)
-            If the driver confirms they received the 'test notification', tell them: "Great! Your `app` is working properly. Please use the `hotspot feature` in your app to increase your chances of getting ride requests."
+            STEP 6: HOTSPOT FEATURE GUIDANCE (if notification received, for drivers in Bangalore)
+            If the driver confirms they received the 'test notification', first you need to ask for the driver is from banglore, {check_for_bangalore}.
+            
+            STEP 7: HOTSPOT FEATURE GUIDANCE (if driver is from banglore)
+            if 'yes' address him about the hotspot feature. If 'no' skip the step. Please use the `hotspot feature` in your app to increase your chances of getting ride requests."
 
-            STEP 7: BASIC TROUBLESHOOTING (if notification not received)
+            STEP 8: BASIC TROUBLESHOOTING (if notification not received)
             Ask the driver to check these basic issues that commonly prevent drivers from receiving rides:
-            {troubleshooting_list}. 
+            {troubleshooting_list}.
 
-
-            **Important** : If the driver mentions 'unblock their account', 'activate their RC', 'need to pay dues', 'payment issues', 'didn't receive payment from a customer', or any other payment-related troubleshooting, tell them to call the {support_team} support team right away, confirm they understand you will involve the support team, then immediately call the bot_fail_to_resolve tool (do not explain the escalation process to the driver).** 
-            if the driver checked all the above issues, use bot_fail_to_resolve tool to escalate the call to {support_team} team.
-
-            if a driver contacts you about other than these issues, use bot_fail_to_resolve tool to escalate the call to {support_team} team.
+            Do not take any phone numbers from the drivers, tell them {rare_phone_number_call}.   
 
             ***IMPORTANT*** : If the driver asks about rc or dl issues or issue in RC activation or ride related issues or not getting rides issues, use the change_agent tool with parameter agent_name='router' to change the agent to the router agent.
+
+            **Important** : If the driver mentions 'unblock their account', 'need to pay dues', 'payment issues', 'didn't receive payment from a customer', or any other payment-related troubleshooting, call the bot_fail_to_resolve tool.** 
+            if the driver checked all the above issues, use bot_fail_to_resolve tool to escalate the call to {support_team} team.
+
+
+            if a driver contacts you about other than these issues, use bot_fail_to_resolve tool to escalate the call to {support_team} team.
 
             if driver asking irrelevant questions, tell them "{irrelevant_response}".
 

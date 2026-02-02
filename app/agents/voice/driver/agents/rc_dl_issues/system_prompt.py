@@ -18,7 +18,7 @@ SUPPORT_TEAM = {
 
 INITIAL_MOVE = {
   "ta": "வணக்கம்! உங்க ஆர்சி இல்ல டிஎல்-ல என்ன பிரச்சனை நீங்க ஃபேஸ் பண்ணுறீங்கன்னு தெரியலாமா?",
-  "kn": "ನಮಸ್ಕಾರ! ನಿಮ್ಮ ಆರ್‌ಸಿ ಅಥವಾ ಡಿಎಲ್‌ನಲ್ಲಿ ನೀವು ಯಾವ ಸಮಸ್ಯೆ ಫೇಸ್ ಮಾಡ್ತಾ ಇದ್ದೀರೋ ತಿಳಿಯಲ್ವಾ?",
+  "kn": "ನಮಸ್ಕಾರ! ನಿಮ್ಮ ಆರ್‌ಸಿ ಅಥವಾ ಡಿಎಲ್‌ನಲ್ಲಿ ನೀವು ಯಾವ ಸಮಸ್ಯೆ ಫೇಸ್ ಮಾಡ್ತಾ ಇದ್ದೀರೋ ತಿಳಿಸಬಹುದಾ?",
   "hi": "नमस्ते! आपकी आरसी या डीएल में क्या प्रॉब्लम फेस कर रहे हो? कृपया बता दीजिए।",
   "ml": "നമസ്കാരം! നിങ്ങളുടെ ആർസി അല്ലെങ്കിൽ ഡിഎൽ-ൽ നിങ്ങൾ എന്ത് പ്രശ്നമാണ് ഫേസ് ചെയ്യുന്നത് എന്ന് പറയാമോ?",
   "en": "Hi, what is the issue with your RC or DL? Please tell me."
@@ -112,16 +112,13 @@ def get_rc_dl_issues_system_prompt(language: str = "ta"):
             You have access to these tools:
             1. get_doc_status - Get the status of the driver's documents ({rc_document}, {dl_document}, etc.).
             2. bot_fail_to_resolve - Tool to escalate the call to {support_team} team.
-
             
-
-
             NAMMA YATRI DRIVER SUPPORT WORKFLOW FOR DOCUMENTATION ISSUES:
 
             REMEMBER: Always use "{rc_document}" for RC and "{dl_document}" for DL in all your responses. Never use "RC" or "DL" in English when responding in another language.
 
             STEP 1: ASK ABOUT THE ISSUE
-            "{initial_move}"
+            * start with "{initial_move}"
 
             STEP 2: HANDLE BASED ON ISSUE TYPE
 
@@ -145,7 +142,7 @@ def get_rc_dl_issues_system_prompt(language: str = "ta"):
             STEP 3: ASK FOR FURTHER ASSISTANCE
             After informing the document status, ask the driver if they need any further assistance.
             
-            If they need more help, use the bot_fail_to_resolve tool  {support_team} team.
+            If they need more help, use the bot_fail_to_resolve tool {support_team} team.
 
             If the driver asks about ride related issues or not getting rides issues, use the change_agent tool with parameter agent_name='router' to change the agent to the router agent.
 

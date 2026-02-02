@@ -24,7 +24,7 @@ from pipecat.transports.daily.transport import DailyParams, DailyTransport
 
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair, LLMContext
+from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair, LLMContext, LLMUserAggregatorParams
 
 
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIProcessor, RTVIObserver
@@ -55,6 +55,8 @@ from app.agents.voice.driver.tts import get_tts_service
 from app.agents.voice.driver.stt import get_stt_service
 from app.agents.voice.driver.llm import get_llm_service
 
+
+from app.agents.voice.driver.utils.detect_idle_user import IdleHandler
 
 from app.agents.voice.driver.utils.handover import HandoverFrame
 
@@ -161,7 +163,12 @@ async def run_bot(room_url: str, token: str, session_id: str, language_code: str
     system_prompt = llms.get_current_context()  
     tools = llms.get_current_tools()
     context = LLMContext(messages=system_prompt, tools=tools)
-    context_aggregator = LLMContextAggregatorPair(context)
+    user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            user_idle_timeout=10.0,  # Detect idle after 10 seconds
+        ),
+    )
     
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
@@ -203,13 +210,13 @@ async def run_bot(room_url: str, token: str, session_id: str, language_code: str
             rtvi,  # RTVI processor
             stt,
             # stt_debug,  # STT output for debugging
-            context_aggregator.user(),  # User responses
+            user_aggregator,  # User responses
             llms,  # LLM
             tts,  # TTS
             transport.output(),  # Transport bot output
             audiobuffer,
             handoverFrame,
-            context_aggregator.assistant(),  # Assistant spoken responses
+            assistant_aggregator,  # Assistant spoken responses
         ]
     )
     # ist_time = datetime.now(ZoneInfo("Asia/Kolkata"))
@@ -242,6 +249,15 @@ async def run_bot(room_url: str, token: str, session_id: str, language_code: str
 
         # Additional actions can be added here
     
+    idle_handler = IdleHandler()
+
+    @user_aggregator.event_handler("on_user_turn_idle")
+    async def on_user_turn_idle(aggregator):
+        await idle_handler.handle_idle(aggregator)
+
+    @user_aggregator.event_handler("on_user_turn_started")
+    async def on_user_turn_started(aggregator, strategy):
+        idle_handler.reset()
 
     @task.event_handler("on_pipeline_error")
     async def on_pipeline_error(task, frame):
@@ -368,11 +384,7 @@ async def run_bot(room_url: str, token: str, session_id: str, language_code: str
                 logger.info(f"Timer cancelled for session {session_id}")
         
         await task.cancel()
-
-
     
-        
-
     @llms.event_handler("on_agent_switched")
     async def on_agent_switched(llms):
         new_context = llms.get_current_context() 
@@ -381,8 +393,8 @@ async def run_bot(room_url: str, token: str, session_id: str, language_code: str
 
         if current_agent_name == "router":
             llm_router_message = "when the driver has issue about their rides or fare. ask them to end the call and select the ride from the app which they have issue."
-            if llm_context and len(llm_context) > 0 and "content" in llm_context[0]:
-                llm_context[0]["content"] = llm_router_message + "\n\n" + llm_context[0]["content"]
+            if new_context and len(new_context) > 0 and "content" in new_context[0]:
+                new_context[0]["content"] = llm_router_message + "\n\n" + new_context[0]["content"]
         
 
 

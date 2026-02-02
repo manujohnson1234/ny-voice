@@ -265,7 +265,25 @@ class RideDetailsService:
         actual_charges = ride_fare.get('actualFareBreakUp', {})
         estimated_charges = ride_fare.get('estimatedFareBreakUp', {})
 
+        bookingStatus = ride_info.get('bookingStatus', None)
+
+        if issue_type == "CANCELLATION":
+            reason_for_cancellation = ride_info.get('cancellationReason', None)
+
+            return {
+                "success": True,
+                "reason_for_cancellation": reason_for_cancellation
+            }
+
         if issue_type == "TOLL_CHARGES":
+
+            if bookingStatus == "CANCELLED":
+                return {
+                    "success": True,
+                    "bookingStatus": bookingStatus
+                }
+            
+
             actual_toll_charges = actual_charges.get('tollCharges', None)
             estimated_toll_charges = estimated_charges.get('tollCharges', None)
             logger.info(f"Toll charges retrieved - Estimated: {estimated_toll_charges}, Actual: {actual_toll_charges}")
@@ -277,6 +295,14 @@ class RideDetailsService:
             }
             
         elif issue_type == "FARE":
+
+            if bookingStatus == "CANCELLED":
+                return {
+                    "success": True,
+                    "bookingStatus": bookingStatus
+                }
+            
+
             estimated_fare = ride_info.get('estimatedFare', None)
             actual_fare = ride_info.get('actualFare', None)
 
@@ -370,7 +396,7 @@ class RideDetailsService:
             logger.info(f"Fare breakdown retrieved - Estimated Fare: {estimated_fare}, Actual Fare: {actual_fare}")
             return response
         else:
-            error_msg = f"Invalid issue_type: {issue_type}. Must be 'TOLL_CHARGES' or 'FARE'"
+            error_msg = f"Invalid issue_type: {issue_type}. Must be 'TOLL_CHARGES' or 'FARE' or 'CANCELLATION'"
             logger.error(error_msg)
             return {"success": False, "error": error_msg}
 
